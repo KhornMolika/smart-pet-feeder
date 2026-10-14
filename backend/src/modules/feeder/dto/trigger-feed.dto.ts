@@ -1,0 +1,11 @@
+import { IsInt, Min, Max, IsOptional } from 'class-validator';
+
+export class TriggerFeedDto {
+  @IsInt()
+  @Min(200)
+  @Max(5000)
+  durationMs: number = 1500;
+
+  @IsOptional()
+  commandId?: string;
+}
