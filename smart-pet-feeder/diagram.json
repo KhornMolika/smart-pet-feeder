@@ -58,11 +58,13 @@
       }
     },
     {
-      "type": "chip-ds1302",
+      "type": "wokwi-ds1307",
       "id": "rtc",
-      "top": -180,
-      "left": 260,
-      "attrs": {}
+      "top": -260,
+      "left": 200,
+      "attrs": {
+        "initTime": "2026-10-15T07:29:45Z"
+      }
     }
   ],
   "connections": [
@@ -80,17 +82,16 @@
     [ "lcd:SDA", "esp:D21", "blue", [ "v0" ] ],
     [ "lcd:SCL", "esp:D22", "cyan", [ "v0" ] ],
 
+    [ "rtc:5V", "esp:VIN", "red", [ "v0" ] ],
+    [ "rtc:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "rtc:SDA", "esp:D21", "blue", [ "v0" ] ],
+    [ "rtc:SCL", "esp:D22", "cyan", [ "v0" ] ],
+
     [ "buzzer:2", "esp:D25", "purple", [ "v0" ] ],
     [ "buzzer:1", "esp:GND.2", "black", [ "v0" ] ],
 
     [ "btn:1.l", "esp:GND.2", "black", [ "v0" ] ],
-    [ "btn:2.l", "esp:D27", "green", [ "v0" ] ],
-
-    [ "rtc:VCC", "esp:3V3", "red", [ "v0" ] ],
-    [ "rtc:GND", "esp:GND.1", "black", [ "v0" ] ],
-    [ "rtc:DAT", "esp:D19", "gold", [ "v0" ] ],
-    [ "rtc:CLK", "esp:D23", "turquoise", [ "v0" ] ],
-    [ "rtc:RST", "esp:D26", "magenta", [ "v0" ] ]
+    [ "btn:2.l", "esp:D27", "green", [ "v0" ] ]
   ],
   "dependencies": {}
 }

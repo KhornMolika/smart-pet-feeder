@@ -20,11 +20,18 @@
  */
 
 #include <WiFi.h>
+#include <time.h>
 #include <PubSubClient.h>
 #include <ESP32Servo.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <ArduinoJson.h>
+
+// ----------------------------------------------------------------------------
+// TIMEZONE & NTP CONFIGURATION (Cambodia / Indochina: UTC+7)
+// ----------------------------------------------------------------------------
+#define TIMEZONE_OFFSET_SEC   (7 * 3600)  // UTC+7 (Phnom Penh / Bangkok)
+#define NTP_SERVER            "pool.ntp.org"
 
 // ----------------------------------------------------------------------------
 // PIN DEFINITIONS
@@ -51,11 +58,15 @@ const char* DEFAULT_DEVICE_ID = "feeder_esp32_01";
 char deviceId[32]             = "feeder_esp32_01";
 
 // Wi-Fi Credentials
-const char* WIFI_SSID     = "PetFeeder_WiFi";
-const char* WIFI_PASSWORD = "FeederPassword123";
+// - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
+// - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
+const char* WIFI_SSID     = "Wokwi-GUEST";
+const char* WIFI_PASSWORD = "";
 
 // MQTT Broker Credentials
-const char* MQTT_SERVER   = "192.168.1.100"; // Or Docker host IP / Mosquitto
+// - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
+// - For Physical Hardware: Change to your laptop IP "192.168.1.17" or AWS Public IP
+const char* MQTT_SERVER   = "broker.hivemq.com";
 const int   MQTT_PORT     = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASS     = "";
@@ -235,6 +246,152 @@ DateTime ds1302GetTime() {
   dt.year   = 2000 + bcdToDec(rawYear);
 
   dt.valid = (dt.month >= 1 && dt.month <= 12 && dt.day >= 1 && dt.day <= 31 && dt.hour <= 23 && dt.minute <= 59);
+  return dt;
+}
+
+// ----------------------------------------------------------------------------
+// DS1307 I2C RTC (Native in Wokwi simulator & standard I2C RTC breakout)
+// ----------------------------------------------------------------------------
+#define DS1307_I2C_ADDR 0x68
+bool isDs1307Present = false;
+
+void ds1307Init() {
+  Wire.beginTransmission(DS1307_I2C_ADDR);
+  if (Wire.endTransmission() == 0) {
+    isDs1307Present = true;
+    Serial.println(F("[RTC] Detected DS1307 on I2C (Address 0x68)"));
+
+    // Check if oscillator is stopped (bit 7 of register 0x00 is CH bit)
+    Wire.beginTransmission(DS1307_I2C_ADDR);
+    Wire.write(0x00);
+    Wire.endTransmission();
+    Wire.requestFrom(DS1307_I2C_ADDR, 1);
+    if (Wire.available()) {
+      uint8_t sec = Wire.read();
+      if (sec & 0x80) { // Clock is halted -> clear CH bit to start oscillator
+        Wire.beginTransmission(DS1307_I2C_ADDR);
+        Wire.write(0x00);
+        Wire.write(sec & 0x7F);
+        Wire.endTransmission();
+      }
+    }
+  } else {
+    isDs1307Present = false;
+  }
+}
+
+DateTime ds1307GetTime() {
+  DateTime dt;
+  Wire.beginTransmission(DS1307_I2C_ADDR);
+  Wire.write(0x00);
+  if (Wire.endTransmission() != 0) {
+    dt.valid = false;
+    return dt;
+  }
+
+  if (Wire.requestFrom(DS1307_I2C_ADDR, 7) == 7) {
+    uint8_t rawSec  = Wire.read() & 0x7F;
+    uint8_t rawMin  = Wire.read() & 0x7F;
+    uint8_t rawHour = Wire.read() & 0x3F;
+    /* uint8_t rawDay = */ Wire.read();
+    uint8_t rawDate = Wire.read() & 0x3F;
+    uint8_t rawMon  = Wire.read() & 0x1F;
+    uint8_t rawYear = Wire.read();
+
+    dt.second = bcdToDec(rawSec);
+    dt.minute = bcdToDec(rawMin);
+    dt.hour   = bcdToDec(rawHour);
+    dt.day    = bcdToDec(rawDate);
+    dt.month  = bcdToDec(rawMon);
+    dt.year   = 2000 + bcdToDec(rawYear);
+    dt.valid  = (dt.month >= 1 && dt.month <= 12 && dt.day >= 1 && dt.day <= 31 && dt.hour <= 23 && dt.minute <= 59);
+  } else {
+    dt.valid = false;
+  }
+  return dt;
+}
+
+void ds1307SetTime(uint8_t hour, uint8_t min, uint8_t sec, uint8_t day, uint8_t month, uint16_t year) {
+  Wire.beginTransmission(DS1307_I2C_ADDR);
+  Wire.write(0x00);
+  Wire.write(decToBcd(sec & 0x7F)); // CH = 0 (oscillator running)
+  Wire.write(decToBcd(min));
+  Wire.write(decToBcd(hour));
+  Wire.write(1); // Day of week (1-7)
+  Wire.write(decToBcd(day));
+  Wire.write(decToBcd(month));
+  Wire.write(decToBcd(year % 100));
+  Wire.endTransmission();
+}
+
+bool ntpSynced = false;
+void syncNtpTime() {
+  if (WiFi.status() != WL_CONNECTED || ntpSynced) return;
+  configTime(TIMEZONE_OFFSET_SEC, 0, NTP_SERVER);
+  struct tm timeinfo;
+  if (getLocalTime(&timeinfo, 1500)) {
+    ntpSynced = true;
+    Serial.printf("[NTP] Synced Cambodia Local Time (UTC+7): %02d:%02d:%02d\n",
+                  timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    if (isDs1307Present) {
+      ds1307SetTime(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+                    timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
+    }
+  }
+}
+
+bool demoScheduleArmed = false;
+void armDemoSchedule(DateTime dt) {
+  if (demoScheduleArmed || !dt.valid) return;
+  demoScheduleArmed = true;
+
+  uint8_t demoMin = (dt.minute + 1) % 60;
+  uint8_t demoHour = (dt.minute == 59) ? (dt.hour + 1) % 24 : dt.hour;
+
+  if (scheduleCount < MAX_SCHEDULES) {
+    schedules[scheduleCount] = { true, demoHour, demoMin, 1500, "Demo Test" };
+    scheduleCount++;
+    Serial.printf("[Schedule] Armed Live Demo Schedule at %02d:%02d (dispenses in <60s)!\n", demoHour, demoMin);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// UNIFIED DUAL-RTC INTERFACE (Auto-switches between DS1307 and DS1302)
+// ----------------------------------------------------------------------------
+void rtcInit() {
+  // 1. Try I2C DS1307 (Wokwi simulator or I2C module)
+  ds1307Init();
+
+  // 2. Also initialize 3-wire DS1302 (Physical breadboard on GPIO 19, 23, 26)
+  ds1302Init();
+
+  if (isDs1307Present) {
+    Serial.println(F("[RTC] Active RTC: DS1307 (I2C)"));
+  } else {
+    Serial.println(F("[RTC] Active RTC: DS1302 (3-Wire GPIO 19, 23, 26)"));
+  }
+}
+
+DateTime rtcGetTime() {
+  DateTime dt;
+  if (isDs1307Present) {
+    dt = ds1307GetTime();
+  } else {
+    dt = ds1302GetTime();
+  }
+
+  // 3. Fallback: If neither physical chip is found, simulate internal clock starting at 07:29:45
+  if (!dt.valid) {
+    unsigned long totalSec = (millis() / 1000) + (7 * 3600 + 29 * 60 + 45);
+    dt.second = totalSec % 60;
+    dt.minute = (totalSec / 60) % 60;
+    dt.hour   = (totalSec / 3600) % 24;
+    dt.day    = 15;
+    dt.month  = 10;
+    dt.year   = 2026;
+    dt.valid  = true;
+  }
+
   return dt;
 }
 
@@ -475,33 +632,57 @@ void reconnectMqtt() {
   }
 }
 
+int getNextScheduleIndex(DateTime dt) {
+  if (scheduleCount == 0) return -1;
+  int curTotalMin = dt.hour * 60 + dt.minute;
+  int minDiff = 24 * 60 + 1;
+  int bestIdx = 0;
+
+  for (int i = 0; i < scheduleCount; i++) {
+    if (!schedules[i].enabled) continue;
+    int schedTotalMin = schedules[i].hour * 60 + schedules[i].minute;
+    int diff = schedTotalMin - curTotalMin;
+    if (diff <= 0) diff += 24 * 60; // Next occurrence is tomorrow
+    if (diff < minDiff) {
+      minDiff = diff;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
 // ----------------------------------------------------------------------------
 // LCD DISPLAY UPDATE
 // ----------------------------------------------------------------------------
 void updateLcd(DateTime dt) {
   if (currentState == STATE_DISPENSING) return; // Dispense UI has priority
 
-  lcd.setCursor(0, 0);
   char line1[17];
+  char rawLine1[17];
   if (dt.valid) {
-    snprintf(line1, sizeof(line1), "%02d:%02d:%02d  %s", dt.hour, dt.minute, dt.second,
+    snprintf(rawLine1, sizeof(rawLine1), "%02d:%02d:%02d  %s", dt.hour, dt.minute, dt.second,
              mqttClient.connected() ? "MQ:OK" : (WiFi.status() == WL_CONNECTED ? "WF:OK" : "NO:WF"));
   } else {
-    snprintf(line1, sizeof(line1), "--:--:--  %s",
+    snprintf(rawLine1, sizeof(rawLine1), "--:--:--  %s",
              mqttClient.connected() ? "MQ:OK" : (WiFi.status() == WL_CONNECTED ? "WF:OK" : "NO:WF"));
   }
+  snprintf(line1, sizeof(line1), "%-16s", rawLine1);
+  lcd.setCursor(0, 0);
   lcd.print(line1);
 
-  lcd.setCursor(0, 1);
   char line2[17];
+  char rawLine2[17];
   if (currentState == STATE_COOLDOWN) {
     unsigned long remainingCooldown = (COOLDOWN_MS - (millis() - lastDispenseEndTime)) / 1000 + 1;
-    snprintf(line2, sizeof(line2), "Cooling... %lus   ", remainingCooldown);
+    snprintf(rawLine2, sizeof(rawLine2), "Cooling... %lus", remainingCooldown);
   } else if (scheduleCount > 0) {
-    snprintf(line2, sizeof(line2), "F:%d%% Nxt:%02d:%02d", currentHopperPercent, schedules[0].hour, schedules[0].minute);
+    int nextIdx = getNextScheduleIndex(dt);
+    snprintf(rawLine2, sizeof(rawLine2), "F:%d%% Nxt:%02d:%02d", currentHopperPercent, schedules[nextIdx].hour, schedules[nextIdx].minute);
   } else {
-    snprintf(line2, sizeof(line2), "Food:%d%% Ready", currentHopperPercent);
+    snprintf(rawLine2, sizeof(rawLine2), "Food:%d%% Ready", currentHopperPercent);
   }
+  snprintf(line2, sizeof(line2), "%-16s", rawLine2);
+  lcd.setCursor(0, 1);
   lcd.print(line2);
 }
 
@@ -530,8 +711,8 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Initializing...");
 
-  // 3. Initialize DS1302 RTC
-  ds1302Init();
+  // 3. Initialize RTC (Auto-detects DS1307 on I2C or DS1302 on 3-Wire)
+  rtcInit();
 
   // 4. Initialize Servo
   foodServo.attach(PIN_SERVO);
@@ -564,8 +745,11 @@ void setup() {
 void loop() {
   unsigned long now = millis();
 
-  // 1. Maintain Wi-Fi and MQTT
+  // 1. Maintain Wi-Fi, NTP Local Time Sync, and MQTT
   if (WiFi.status() == WL_CONNECTED) {
+    if (!ntpSynced) {
+      syncNtpTime();
+    }
     if (!mqttClient.connected()) {
       reconnectMqtt();
     } else {
@@ -574,7 +758,8 @@ void loop() {
   }
 
   // 2. Read Time & Execute Schedules
-  DateTime nowDt = ds1302GetTime();
+  DateTime nowDt = rtcGetTime();
+  armDemoSchedule(nowDt);
   checkOfflineSchedules(nowDt);
 
   // 3. Tactile Push Button Handling (Debounced)

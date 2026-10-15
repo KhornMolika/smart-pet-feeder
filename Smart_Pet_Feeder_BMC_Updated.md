@@ -25,10 +25,15 @@
 
 ## Table of Contents
 
-1. [Problem Statement](#problem-statement)
+1. [I. Opportunity Identification](#i-opportunity-identification)
+   - [1.1 Overview of the Opportunity](#11-overview-of-the-opportunity)
+   - [1.2 Macro & Local Pet Ownership Trends in Cambodia](#12-macro--local-pet-ownership-trends-in-cambodia)
+   - [1.3 Identified Market Gaps & Competitor Landscape](#13-identified-market-gaps--competitor-landscape)
+   - [1.4 Strategic Opportunity Criteria Evaluation](#14-strategic-opportunity-criteria-evaluation)
+2. [II. Problem Statement](#ii-problem-statement)
    - [An overview of your business idea (two or three sentences).](#an-overview-of-your-business-idea-two-or-three-sentences)
    - [A description of your product. What problems are you solving for your target customers?](#a-description-of-your-product-what-problems-are-you-solving-for-your-target-customers)
-2. [Business Model Canvas](#business-model-canvas)
+3. [III. Business Model Canvas](#iii-business-model-canvas)
    - [Customer Segment](#customer-segment)
    - [Value Proposition (Designing the innovative solution)](#value-proposition-designing-the-innovative-solution)
    - [Channel](#channel)
@@ -38,58 +43,81 @@
    - [Key Activities](#key-activities)
    - [Key Partners](#key-partners)
    - [Cost Structure](#cost-structure)
-3. [References (APA 7th Edition)](#references-apa-7th-edition)
-4. [Appendixes](#appendixes)
+4. [IV. References (APA 7th Edition)](#iv-references-apa-7th-edition)
+5. [V. Appendixes](#v-appendixes)
    - [Appendix A: Business Model Canvas 9-Block Summary Matrix](#appendix-a-business-model-canvas-9-block-summary-matrix)
    - [Appendix B: Empirical Hardware Bill of Materials (BOM) & KHMERES Component Sourcing Proof](#appendix-b-empirical-hardware-bill-of-materials-bom--khmeres-component-sourcing-proof)
    - [Appendix C: Detailed Financial Calculations, Unit Economics & Break-Even Analysis](#appendix-c-detailed-financial-calculations-unit-economics--break-even-analysis)
 
 ---
 
-## Problem Statement
+## I. Opportunity Identification
 
-### An overview of your business idea (two or three sentences).
-Our business develops the **Smart Pet Feeder**, an automated, app-connected nutrition management device designed to make pet feeding easier, consistent, and less dependent on manual effort. Operating natively through a Telegram Mini App with an onboard battery-backed Real-Time Clock (RTC), the device ensures pets are fed measured dry food portions on time even during residential Wi-Fi and power disruptions. The venture provides an affordable, locally serviceable solution in Cambodia that eliminates daily feeding anxiety for busy pet owners while offering future multi-device automation for commercial pet care facilities.
+### 1.1 Overview of the Opportunity
+Busy work schedules, long periods away from home, and unexpected commitments can make it difficult for pet owners to maintain consistent feeding routines. Smart feeding technology offers an opportunity to reduce dependence on manual feeding by combining automated scheduling with remote control.
 
-### A description of your product. What problems are you solving for your target customers?
+Our Smart Pet Feeder aims to provide a convenient, affordable solution for pet owners in Cambodia through scheduled food dispensing, a Telegram Mini App, and feeding activity notifications. The business will initially target individual pet owners who need flexible feeding management, with opportunities to expand into pet care facilities as the product develops.
 
-#### 1. Opportunity Identification & Urban Pet Trends in Cambodia
-Over the past five years, urban centers in Cambodia—predominantly Phnom Penh, Siem Reap, and Battambang—have witnessed a major cultural shift in pet guardianship. Domestic cats and dogs are increasingly cherished as beloved family companions rather than working animals, leading to rapid expansion in pet clinics, grooming salons, and retail pet food shops across districts such as Toul Kork, Boeung Keng Kang (BKK1), and Chamkarmon. 
+The commercial opportunity will be evaluated through customer feedback, competitor pricing, production costs, and willingness-to-pay research (Department of Management, n.d.).
 
-However, modern urban living creates significant lifestyle friction:
-- **Extended Work Hours and Commuting Delays:** Working professionals, corporate staff, bank employees, and university students frequently spend 10 to 12 hours away from home due to rigid shifts and heavy traffic congestion.
-- **Unpredictable Schedules:** Frequent business travel, sudden overtime, and shift work make it extremely difficult for pet guardians to maintain consistent daily feeding routines.
-- **The Smart Technology Opportunity:** Smart feeding technology presents a substantial commercial opportunity to reduce human dependence on manual feeding by combining automated schedule execution with remote visibility and control. Grounded in opportunity screening criteria (Department of Management, n.d.), the venture evaluates market feasibility through customer discovery interviews, competitor price benchmarking, local component sourcing, and willingness-to-pay research.
+### 1.2 Macro & Local Pet Ownership Trends in Cambodia
+Over the past five years, urban centers in Cambodia—predominantly Phnom Penh, Siem Reap, and Battambang—have experienced a cultural transformation in pet guardianship. As household incomes rise and urbanization accelerates, pets (primarily domestic cats and small dogs) are increasingly regarded as family companions rather than working animals. This shift has stimulated substantial growth in pet shops, veterinary clinics, grooming salons, and premium pet food retail across districts such as Toul Kork, Boeung Keng Kang (BKK1), Chamkarmon, and Sen Sok.
 
-#### 2. Core Problems Solved for Target Customers
-Pets require measured amounts of food delivered at regular intervals to maintain healthy metabolic functions. In everyday practice, pet guardians face acute challenges:
-- **Delayed, Missed, or Forgotten Feedings:** People frequently struggle to maintain their pets' nutritional routines because of tight schedules and conflicting commitments (Zainuddin et al., 2024). When owners are delayed away from home, feedings are inevitably postponed or skipped entirely.
-- **Severe Health and Veterinary Risks:** Prolonged fasting in cats triggers feline hepatic lipidosis (fatty liver disease), while irregular canine feeding causes gastric acid reflux, digestive distress, and behavioral anxiety. 
-- **Inaccurate Portion Guesswork:** Manual feeding often relies on rough visual estimation rather than measured portions, which frequently leads to overfeeding and long-term pet obesity. Furthermore, manual feeding leaves no verifiable historical record of when, whether, or how much a pet was fed while family members were away.
-- **Critical Flaws of Existing Market Alternatives in Cambodia:**
-  - *Traditional Gravity Feeders ($5.00–$12.00):* Dispense kibble continuously without portion regulation, inevitably leading to overeating and gastrointestinal illness.
-  - *Imported Smart Feeders ($65.00–$95.00, e.g., Xiaomi, Petkit):* Prohibitively expensive for local university students and young professionals, require separate proprietary mobile apps (frequently unlocalized), and suffer from cloud desynchronization during common residential Wi-Fi drops.
-  - *Generic Chinese Tuya Feeders ($42.00–$58.00):* Feature fragile plastic gears, unreliable internal timekeeping, and complete absence of local technical support or spare parts in Phnom Penh.
+However, modern urban living creates lifestyle friction:
+- **Extended Working & Commuting Hours:** Young professionals, bank staff, corporate employees, and university students frequently spend 10 to 12 hours away from home due to work commitments, lectures, and Phnom Penh traffic congestion.
+- **Strict Feeding Schedules:** Veterinarians emphasize that scheduled, portion-controlled meals prevent feline hepatic lipidosis, canine gastric dilation, obesity, and behavioral anxiety.
+- **Frequent Connectivity Instability:** Residential fiber and Wi-Fi networks in Cambodia occasionally suffer from temporary ISP drops, router resets, or neighborhood power maintenance, making cloud-only imported feeders unreliable.
 
-#### 3. Technical Product Description
-The Smart Pet Feeder delivers an integrated, locally serviceable solution combining custom physical hardware and a cloud software ecosystem:
-- **Core Processing & Power Regulation:** Built around the dual-core ESP32 30-Pin DevKit V1 mounted on an expansion base shield to prevent electrical brownouts and voltage drops during motor actuation.
-- **Rotary Shutter Dispenser Mechanism:** Dry kibble is held in an airtight 1.8-liter food-grade PET hopper (storing 800g to 1kg dry kibble) and dispensed via an SG90S micro-servo motor actuating a rotational shutter gate. Dispense duration is bounded in firmware between 200ms and 5000ms, followed by an enforced 3000ms motor cooldown to prevent kibble jamming.
-- **Real-Time Ultrasonic Food Sensing:** An HC-SR04 ultrasonic sensor mounted above the food container continuously measures dry food depth, converting readings into real-time hopper fullness (0% to 100%) and triggering low-food warning messages to Telegram when capacity falls below 20%.
-- **Battery-Backed Offline Timekeeping:** An onboard DS1302 Real-Time Clock (RTC) with a Sony CR2032 3V coin-cell battery runs independently from the internet, guaranteeing that active feeding schedules stored in non-volatile flash memory execute accurately even during complete Wi-Fi or router outages.
-- **Visual Display & Auditory Feedback:** A 16x2 I2C LCD screen displays current local time, Wi-Fi status, and real-time hopper fill percentage. An active buzzer emits pleasant feeding call melodies and distinct error alerts.
-- **Empirical Local Sourcing Proof:** All core electronic components are sourced directly from local distributor KHMERES Electronics in Phnom Penh (KHMERES Electronics, 2026), keeping production costs low and ensuring local spare parts availability.
+### 1.3 Identified Market Gaps & Competitor Landscape
 
-#### 4. Innovative Solution & Competitive Differentiation
-The Smart Pet Feeder addresses customer problems by dispensing measured portions on schedule so feeding no longer depends on someone being physically present:
-- **Connected Technology Feasibility:** Similar IoT-based pet feeders have validated that combining automated food dispensing with mobile app control makes pet feeding significantly more manageable (Castillo Rangel et al., 2024; Zainuddin et al., 2024).
-- **Zero-App-Installation Telegram Mini App:** Rather than requiring users to download another heavy mobile app from Google Play or the App Store, the entire control interface runs natively inside **Telegram**—Cambodia's dominant messaging platform. Pet owners can adjust schedules, trigger instant feeds, and review historical logs directly within their daily chat app.
-- **Guaranteed Offline Resilience:** If the home router loses power or the residential ISP experiences a drop, the feeder's DS1302 RTC triggers meals on schedule without fail.
-- **Accessible Local Affordability & Warranty:** Targeted at a retail price of **$38.00** (nearly 50% lower than imported alternatives) backed by a 6-month local replacement warranty and immediate local repairs in Phnom Penh.
+| Competitor Category | Representative Products | Retail Price (Phnom Penh) | Key Advantages | Critical Deficiencies |
+| :--- | :--- | :--- | :--- | :--- |
+| **Traditional Gravity Feeders** | Generic plastic gravity hoppers | $5.00 – $12.00 | Very cheap; no electricity required. | Uncontrolled overfeeding; leads to pet obesity; no remote visibility or scheduling. |
+| **Imported Global Smart Feeders** | Xiaomi Smart Pet Feeder, Petkit Fresh Element | $65.00 – $95.00 | Polished aesthetics; branded ecosystem; motorized anti-jam. | Expensive; requires separate proprietary mobile apps; no local warranty/repair in Cambodia; prone to cloud desync. |
+| **Generic Chinese Tuya Feeders** | Tuya/Smart Life OEM Feeders | $42.00 – $58.00 | Moderate pricing; smartphone app support. | Inconsistent offline timekeeping; generic app UX; fragile plastic gears; zero local technical support or spare parts. |
+| **Proposed Smart Pet Feeder (Our Solution)** | **Custom ESP32 + Telegram Mini App Feeder** | **$38.00 (Standard)** *(B2B Bulk: $30.00)* | **Telegram Mini App native (no app install); DS1302 offline schedule execution; HC-SR04 ultrasonic food level sensing; 100% locally serviceable with parts from KHMERES.** | Prototype casing requires manual assembly; SG90S micro-servo suitable for small kibble only (must avoid large dog biscuits). |
+
+### 1.4 Strategic Opportunity Criteria Evaluation
+Following the entrepreneurship opportunity screening criteria outlined in the MGT-403 curriculum (Department of Management, n.d.):
+1. **Customer Need:** Strong and immediate pain point among pet owners anxious about feeding routines while away.
+2. **Execution Capability:** The multidisciplinary engineering team possesses hands-on expertise across ESP32 embedded C++, NestJS backend, MQTT networking, and Next.js frontend development.
+3. **Competitive Differentiation:** Seamless Telegram integration (bypassing Google Play / Apple App Store downloads) combined with guaranteed battery-backed offline execution and local component availability.
+4. **Unit Economics & Margin Viability:** Electronics BOM validated by real local quotations ($20 kit from KHMERES Electronics, 2026) ensuring over 45% contribution margins at scale.
+5. **Growth Potential:** Scalable from initial B2C direct sales to local pet shops, veterinary clinics, cat cafes, and boarding facilities.
 
 ---
 
-## Business Model Canvas
+## II. Problem Statement
+
+### An overview of your business idea (two or three sentences).
+Our business develops the **Smart Pet Feeder**, an automated, app-connected nutrition management device that takes care of regular pet feeding. We aim to make feeding easier, more consistent, and less dependent on manual effort, so pets are fed on time and in the right amounts. Operating natively through a Telegram Mini App with an onboard battery-backed Real-Time Clock (RTC), the device ensures pets are fed measured dry food portions even during residential Wi-Fi and power disruptions.
+
+### A description of your product. What problems are you solving for your target customers?
+
+#### 1. Core Problems Solved for Target Customers
+Pets need to be fed at regular times in measured amounts, but busy or unpredictable schedules can make this hard to manage. Feedings can be delayed, missed, or forgotten, and portions are often estimated rather than measured. People often struggle to maintain their pets' nutrition because of tight schedules (Zainuddin et al., 2024). Manual feeding also leaves no reliable record of when and how much a pet was fed.
+- **Nutritional and Health Risks:** Missing meals or irregular routines causes serious complications, including feline hepatic lipidosis (fatty liver syndrome) and canine acid reflux.
+- **Portion Guesswork vs. Obesity:** Inaccurate manual scoops lead to chronic overfeeding and pet obesity.
+- **Alternative Flaws:** Traditional gravity hoppers ($5–$12) cause overfeeding, while imported smart feeders ($65–$95) are expensive, require separate apps, and desynchronize during Wi-Fi drops.
+
+#### 2. Technical Product Description
+The Smart Pet Feeder is an automated device that dispenses a set amount of pet food at scheduled times. Through its mobile app, users can set feeding schedules, control portion sizes, receive notifications, and view a feeding history log:
+- **Core MCU & Power Regulation:** ESP32 30-Pin DevKit V1 mounted on an expansion base shield for clean 5V power and brownout prevention.
+- **Rotary Shutter Gate:** SG90S micro-servo actuating a rotational shutter beneath a 1.8-liter airtight PET food hopper (storing 800g to 1kg dry kibble). Dispense duration is bounded in firmware between 200ms and 5000ms, followed by an enforced 3000ms motor cooldown.
+- **Ultrasonic Level Sensing:** HC-SR04 ultrasonic sensor continuously measuring container depth (0% to 100%) and triggering low-food alerts to Telegram below 20%.
+- **Offline Timekeeping:** DS1302 Real-Time Clock with Sony CR2032 3V battery executing schedules on time without internet connectivity.
+- **Local Interface:** 16x2 I2C LCD screen and active buzzer for melody chimes and alerts.
+- **Local Component Sourcing:** Grounded in component pricing from KHMERES Electronics in Phnom Penh (KHMERES Electronics, 2026).
+
+#### 3. Innovative Solution & Competitive Differentiation
+The Smart Pet Feeder addresses this problem by dispensing measured portions on a schedule, so feeding no longer depends on someone being present. Similar IoT-based pet feeders have used automated food dispensing and smartphone control, showing how connected technology can make pet feeding more manageable (Castillo Rangel et al., 2024; Zainuddin et al., 2024).
+- **Zero-Install Telegram Mini App:** Operates natively inside Telegram, removing third-party app download barriers.
+- **Guaranteed Offline Resilience:** Pre-set schedules execute reliably regardless of home Wi-Fi drops.
+- **Accessible Local Pricing & Warranty:** Priced at an accessible target price of $38.00 with 6-month local replacement and repair support in Phnom Penh.
+
+---
+
+## III. Business Model Canvas
 
 This business model analysis follows the nine building blocks framework established by Osterwalder and Pigneur (2010), adhering to the opportunity screening and validation standards specified in the MGT-403 entrepreneurship curriculum (Department of Management, n.d.).
 
@@ -323,7 +351,7 @@ Component costs are verified directly through local distributor KHMERES Electron
 
 ---
 
-## References (APA 7th Edition)
+## IV. References (APA 7th Edition)
 
 Castillo Rangel, A. V., Ponce, I. U., & Soto, I. (2024). Automatic pet feed system applying IoT. *Modelling, Measurement and Control D*, *45*(1–4), 87–93. https://doi.org/10.18280/mmc_d.451-413
 
@@ -339,7 +367,7 @@ Zainuddin, A. A., Mahazir, M. N. B., Adanan, M. A. A., Mohd. Tamrin, M. I., Zulk
 
 ---
 
-## Appendixes
+## V. Appendixes
 
 ### Appendix A: Business Model Canvas 9-Block Summary Matrix
 
