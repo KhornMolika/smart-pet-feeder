@@ -5,7 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 
 export const metadata: Metadata = {
   title: 'ចិញ្ចឹម (ChinChem) | Smart Pet Feeder Telegram Mini App',
-  description: 'Precision automated pet feeding with multi-device support, RTC schedules, and servo portioning.',
+  description: 'Smart automated pet feeder with custom feeding schedules, portion control, and instant feeding.',
   icons: {
     icon: '/images/logo.png',
   },

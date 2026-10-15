@@ -30,7 +30,7 @@ export class UpdateScheduleDto {
 
   @IsInt()
   @Min(200)
-  @Max(5000)
+  @Max(180000)
   @IsOptional()
   durationMs?: number;
 

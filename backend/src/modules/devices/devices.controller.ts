@@ -1,7 +1,9 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -10,12 +12,40 @@ import {
 } from '@nestjs/common';
 import { DevicesService } from './devices.service.js';
 import { UpdateSettingsDto } from './dto/update-settings.dto.js';
+import { ClaimDeviceDto } from './dto/claim-device.dto.js';
+import { CreateInviteDto } from './dto/create-invite.dto.js';
+import { JoinDeviceDto } from './dto/join-device.dto.js';
 import { TelegramAuthGuard } from '../../common/guards/telegram-auth.guard.js';
+import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import type { AuthenticatedUser } from '../../common/guards/telegram-auth.guard.js';
 
 @Controller('api/v1/devices')
 @UseGuards(TelegramAuthGuard)
 export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
+
+  @Get('claim/preview/:token')
+  async previewClaim(@Param('token') token: string) {
+    return this.devicesService.previewClaim(token);
+  }
+
+  @Post('claim')
+  @HttpCode(HttpStatus.CREATED)
+  async claimDevice(
+    @Body() dto: ClaimDeviceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.devicesService.claimDevice(dto, user);
+  }
+
+  @Post('join')
+  @HttpCode(HttpStatus.CREATED)
+  async joinDevice(
+    @Body() dto: JoinDeviceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.devicesService.joinDevice(dto, user);
+  }
 
   @Get(':id')
   async getDevice(@Param('id') id: string) {
@@ -25,6 +55,31 @@ export class DevicesController {
   @Get(':id/status')
   async getDeviceStatus(@Param('id') id: string) {
     return this.devicesService.getDeviceStatus(id);
+  }
+
+  @Get(':id/members')
+  async getDeviceMembers(@Param('id') id: string) {
+    return this.devicesService.getDeviceMembers(id);
+  }
+
+  @Post(':id/invite')
+  @HttpCode(HttpStatus.CREATED)
+  async createInvite(
+    @Param('id') id: string,
+    @Body() dto: CreateInviteDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.devicesService.createInvite(id, dto, user);
+  }
+
+  @Delete(':id/members/:memberId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeMember(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.devicesService.removeMember(id, memberId, user);
   }
 
   @Get(':id/settings')

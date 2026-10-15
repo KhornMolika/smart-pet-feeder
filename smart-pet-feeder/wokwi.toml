@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "smart-pet-feeder.ino"
+elf = "build/esp32.esp32.esp32/smart-pet-feeder.ino.elf"

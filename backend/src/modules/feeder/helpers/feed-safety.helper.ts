@@ -6,12 +6,12 @@ export interface SafetyConfig {
 
 export const DEFAULT_SAFETY: SafetyConfig = {
   minDurationMs: 200,
-  maxDurationMs: 5000,
+  maxDurationMs: 180000,
   cooldownSeconds: 3,
 };
 
 /**
- * Validates whether the requested servo duration is within safe physical operating limits.
+ * Validates whether the requested food feeding duration is within safe physical operating limits.
  */
 export function validateDurationBounds(
   durationMs: number,

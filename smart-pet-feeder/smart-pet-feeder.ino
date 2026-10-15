@@ -37,6 +37,12 @@
 #define PIN_DS1302_DAT    19
 #define PIN_DS1302_CLK    23
 #define PIN_DS1302_RST    26
+#define PIN_ULTRASONIC_TRIG  32
+#define PIN_ULTRASONIC_ECHO  35
+
+// Food Hopper Dimensions (Adjust to your physical container height in cm)
+#define HOPPER_EMPTY_DISTANCE_CM  22.0  // Distance from sensor to empty container bottom (0%)
+#define HOPPER_FULL_DISTANCE_CM    3.0  // Distance from sensor when full of dry food (100%)
 
 // ----------------------------------------------------------------------------
 // DEVICE & NETWORK CONFIGURATION (Defaults; overridable via build/config)
@@ -127,9 +133,12 @@ struct DateTime {
   bool valid;
 };
 
-// LCD Update Timer
+// Timers & Sensors
 unsigned long lastLcdUpdate = 0;
 unsigned long lastStateTelemetry = 0;
+unsigned long lastUltrasonicCheck = 0;
+float currentFoodDistanceCm = 6.0;
+int currentHopperPercent = 80;
 
 // ----------------------------------------------------------------------------
 // DS1302 3-WIRE BIT-BANG PROTOCOL IMPLEMENTATION
@@ -249,6 +258,41 @@ void buzzerBeepError() {
 }
 
 // ----------------------------------------------------------------------------
+// HC-SR04 ULTRASONIC FOOD LEVEL SENSOR
+// ----------------------------------------------------------------------------
+float readUltrasonicDistanceCm() {
+  digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
+  delayMicroseconds(2);
+  digitalWrite(PIN_ULTRASONIC_TRIG, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
+
+  // Measure pulse duration (timeout 30000us = ~5m max distance)
+  long duration = pulseIn(PIN_ULTRASONIC_ECHO, HIGH, 30000);
+  if (duration == 0) {
+    return -1.0; // Sensor timeout or reading error
+  }
+  return (duration * 0.0343) / 2.0;
+}
+
+int calculateHopperPercent(float distanceCm) {
+  if (distanceCm < 0) return currentHopperPercent;
+  // Constrain distance within physical container depth
+  float clamped = constrain(distanceCm, HOPPER_FULL_DISTANCE_CM, HOPPER_EMPTY_DISTANCE_CM);
+  // Map: closer distance = fuller hopper
+  float pct = ((HOPPER_EMPTY_DISTANCE_CM - clamped) / (HOPPER_EMPTY_DISTANCE_CM - HOPPER_FULL_DISTANCE_CM)) * 100.0;
+  return (int)round(pct);
+}
+
+void updateFoodLevel() {
+  float dist = readUltrasonicDistanceCm();
+  if (dist > 0.0) {
+    currentFoodDistanceCm = dist;
+    currentHopperPercent = calculateHopperPercent(dist);
+  }
+}
+
+// ----------------------------------------------------------------------------
 // SERVO CONTROL & DISPENSE ENGINE
 // ----------------------------------------------------------------------------
 void closeGate() {
@@ -338,6 +382,7 @@ void updateDispenseEngine() {
   } else if (currentState == STATE_COOLDOWN) {
     if (now - lastDispenseEndTime >= COOLDOWN_MS) {
       currentState = STATE_IDLE;
+      updateFoodLevel(); // Remeasure hopper depth after kibble has settled
     }
   }
 }
@@ -453,9 +498,9 @@ void updateLcd(DateTime dt) {
     unsigned long remainingCooldown = (COOLDOWN_MS - (millis() - lastDispenseEndTime)) / 1000 + 1;
     snprintf(line2, sizeof(line2), "Cooling... %lus   ", remainingCooldown);
   } else if (scheduleCount > 0) {
-    snprintf(line2, sizeof(line2), "Next: %02d:%02d (%d) ", schedules[0].hour, schedules[0].minute, schedules[0].durationMs);
+    snprintf(line2, sizeof(line2), "F:%d%% Nxt:%02d:%02d", currentHopperPercent, schedules[0].hour, schedules[0].minute);
   } else {
-    snprintf(line2, sizeof(line2), "Ready: Press Btn");
+    snprintf(line2, sizeof(line2), "Food:%d%% Ready", currentHopperPercent);
   }
   lcd.print(line2);
 }
@@ -471,6 +516,9 @@ void setup() {
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
+  pinMode(PIN_ULTRASONIC_TRIG, OUTPUT);
+  pinMode(PIN_ULTRASONIC_ECHO, INPUT);
+  digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
 
   // 2. Initialize LCD
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
@@ -489,16 +537,19 @@ void setup() {
   foodServo.attach(PIN_SERVO);
   closeGate(); // Ensure closed gate on boot
 
-  // 5. Default Schedules
+  // 5. Initial Food Level Measurement
+  updateFoodLevel();
+
+  // 6. Default Schedules
   schedules[0] = { true, 7, 30, 700, "Breakfast" };
   schedules[1] = { true, 18, 0, 700, "Dinner" };
   scheduleCount = 2;
 
-  // 6. Connect Wi-Fi (non-blocking attempt)
+  // 7. Connect Wi-Fi (non-blocking attempt)
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // 7. Configure MQTT
+  // 8. Configure MQTT
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   mqttClient.setCallback(onMqttMessage);
 
@@ -550,25 +601,33 @@ void loop() {
     updateLcd(nowDt);
   }
 
-  // 6. Periodic State Telemetry over MQTT (every 10s)
+  // 6. Periodic Ultrasonic Depth Check (every 5s when idle)
+  if (currentState == STATE_IDLE && (now - lastUltrasonicCheck >= 5000)) {
+    lastUltrasonicCheck = now;
+    updateFoodLevel();
+  }
+
+  // 7. Periodic State Telemetry over MQTT (every 10s)
   if (now - lastStateTelemetry >= 10000 && mqttClient.connected()) {
     lastStateTelemetry = now;
     char topic[64];
     snprintf(topic, sizeof(topic), "feeders/%s/state", deviceId);
 
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<384> doc;
     doc["deviceId"] = deviceId;
     doc["online"] = true;
     doc["state"] = (currentState == STATE_IDLE ? "idle" : (currentState == STATE_DISPENSING ? "dispensing" : "cooldown"));
     doc["rtcValid"] = nowDt.valid;
     doc["uptimeSeconds"] = millis() / 1000;
+    doc["hopperPercent"] = currentHopperPercent;
+    doc["foodDistanceCm"] = currentFoodDistanceCm;
     if (nowDt.valid) {
       char timeBuf[9];
       snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d", nowDt.hour, nowDt.minute, nowDt.second);
       doc["rtcTime"] = timeBuf;
     }
 
-    char buffer[256];
+    char buffer[384];
     serializeJson(doc, buffer);
     mqttClient.publish(topic, buffer, false);
   }

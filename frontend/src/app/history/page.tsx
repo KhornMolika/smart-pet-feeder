@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { Suspense } from 'react';
 import { HistoryScreen } from '@/components/history/history-screen';
 
 export const metadata: Metadata = {
@@ -7,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default function HistoryPage() {
-  return <HistoryScreen />;
+  return (
+    <Suspense fallback={null}>
+      <HistoryScreen />
+    </Suspense>
+  );
 }

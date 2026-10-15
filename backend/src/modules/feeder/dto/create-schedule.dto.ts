@@ -29,8 +29,8 @@ export class CreateScheduleDto {
 
   @IsInt()
   @Min(200)
-  @Max(5000)
-  durationMs: number = 1500;
+  @Max(180000)
+  durationMs: number = 60000;
 
   @IsBoolean()
   @IsOptional()

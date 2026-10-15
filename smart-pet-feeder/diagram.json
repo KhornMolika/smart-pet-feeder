@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "author": "Antigravity Pet Feeder Team",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "wokwi-esp32-devkit-v1",
+      "id": "esp",
+      "top": 0,
+      "left": 0,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-lcd1602",
+      "id": "lcd",
+      "top": -260,
+      "left": -60,
+      "attrs": {
+        "pins": "i2c"
+      }
+    },
+    {
+      "type": "wokwi-hc-sr04",
+      "id": "ultrasonic",
+      "top": -140,
+      "left": -320,
+      "attrs": {
+        "distance": "6"
+      }
+    },
+    {
+      "type": "wokwi-servo",
+      "id": "servo",
+      "top": 80,
+      "left": 280,
+      "attrs": {
+        "horn": "single"
+      }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn",
+      "top": 200,
+      "left": -180,
+      "attrs": {
+        "color": "green",
+        "label": "Feed"
+      }
+    },
+    {
+      "type": "wokwi-buzzer",
+      "id": "buzzer",
+      "top": 60,
+      "left": -240,
+      "attrs": {
+        "volume": "1.0",
+        "mode": "smooth"
+      }
+    },
+    {
+      "type": "chip-ds1302",
+      "id": "rtc",
+      "top": -180,
+      "left": 260,
+      "attrs": {}
+    }
+  ],
+  "connections": [
+    [ "ultrasonic:VCC", "esp:VIN", "red", [ "v0" ] ],
+    [ "ultrasonic:GND", "esp:GND.2", "black", [ "v0" ] ],
+    [ "ultrasonic:TRIG", "esp:D32", "orange", [ "v0" ] ],
+    [ "ultrasonic:ECHO", "esp:D35", "green", [ "v0" ] ],
+
+    [ "servo:V+", "esp:VIN", "red", [ "v0" ] ],
+    [ "servo:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "servo:PWM", "esp:D18", "orange", [ "v0" ] ],
+
+    [ "lcd:VCC", "esp:VIN", "red", [ "v0" ] ],
+    [ "lcd:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "lcd:SDA", "esp:D21", "blue", [ "v0" ] ],
+    [ "lcd:SCL", "esp:D22", "cyan", [ "v0" ] ],
+
+    [ "buzzer:2", "esp:D25", "purple", [ "v0" ] ],
+    [ "buzzer:1", "esp:GND.2", "black", [ "v0" ] ],
+
+    [ "btn:1.l", "esp:GND.2", "black", [ "v0" ] ],
+    [ "btn:2.l", "esp:D27", "green", [ "v0" ] ],
+
+    [ "rtc:VCC", "esp:3V3", "red", [ "v0" ] ],
+    [ "rtc:GND", "esp:GND.1", "black", [ "v0" ] ],
+    [ "rtc:DAT", "esp:D19", "gold", [ "v0" ] ],
+    [ "rtc:CLK", "esp:D23", "turquoise", [ "v0" ] ],
+    [ "rtc:RST", "esp:D26", "magenta", [ "v0" ] ]
+  ],
+  "dependencies": {}
+}

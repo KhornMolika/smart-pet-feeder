@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { envValidationSchema } from './config/env.validation.js';
 import { Device } from './modules/devices/entities/device.entity.js';
 import { DeviceSettings } from './modules/devices/entities/device-settings.entity.js';
+import { DeviceMember } from './modules/devices/entities/device-member.entity.js';
 import { FeedingSchedule } from './modules/feeder/entities/feeding-schedule.entity.js';
 import { FeedCommand } from './modules/feeder/entities/feed-command.entity.js';
 import { FeedingEvent } from './modules/feeder/entities/feeding-event.entity.js';
@@ -40,6 +41,7 @@ import { HealthModule } from './modules/health/health.module.js';
         const entities = [
           Device,
           DeviceSettings,
+          DeviceMember,
           FeedingSchedule,
           FeedCommand,
           FeedingEvent,

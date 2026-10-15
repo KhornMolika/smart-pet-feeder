@@ -14,13 +14,6 @@
   --border-color: rgba(20, 53, 3, 0.12);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
 html,
 body {
   max-width: 100vw;
@@ -29,6 +22,7 @@ body {
   color: #143503;
   font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -44,11 +38,19 @@ body {
 
 /* Card Surface Utility - Clean, Modern & Minimalist */
 .artisan-card {
+  box-sizing: border-box;
   background: #FFFFFF;
   border: 1px solid rgba(20, 53, 3, 0.08);
   border-radius: 1.25rem;
   box-shadow: 0 4px 20px -2px rgba(20, 53, 3, 0.04);
+  padding: 1.25rem;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (min-width: 640px) {
+  .artisan-card {
+    padding: 1.5rem;
+  }
 }
 
 .artisan-card:hover {

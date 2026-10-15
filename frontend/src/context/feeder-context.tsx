@@ -11,8 +11,20 @@ interface FeederContextType {
   activeDevice: FeederDevice;
   activeDeviceId: string;
   switchDevice: (id: string) => void;
-  addDevice: (data: { name: string; petName: string; petEmoji: string; room: string }) => FeederDevice;
+  addDevice: (data: {
+    name: string;
+    petName: string;
+    petEmoji: string;
+    room: string;
+    claimToken?: string;
+  }) => FeederDevice;
+  removeDevice: (deviceId: string) => boolean;
+  toggleAwayMode: (deviceId: string) => void;
   updateDevicePresets: (deviceId: string, presets: PortionPreset[]) => void;
+  updateDeviceTarget: (deviceId: string, target: number) => void;
+  updateDeviceNextScheduledFeedAt: (deviceId: string, isoString: string | null) => void;
+  refillHopper: (deviceId: string) => void;
+  recordDispense: (deviceId: string, durationMs?: number) => void;
 
   // History & Logs
   history: FeedingEvent[];
@@ -23,6 +35,18 @@ interface FeederContextType {
   setSelectedDeviceId: (id: string) => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  timeframe: import('@/hooks/useDeviceHistory').TimeframeFilter;
+  setTimeframe: (timeframe: import('@/hooks/useDeviceHistory').TimeframeFilter) => void;
+  customStartDate: string | null;
+  customEndDate: string | null;
+  setCustomStartDate: (date: string | null) => void;
+  setCustomEndDate: (date: string | null) => void;
+  setCustomDateRange: (start: string | null, end: string | null) => void;
+  customDate: string | null;
+  setCustomDate: (date: string | null) => void;
+  clientNow: Date | null;
+  timeframeCounts: { all: number; today: number; this_week: number; this_month: number };
+  clearFilters: () => void;
   addHistoryEvent: (event: FeedingEvent) => void;
   exportCsv: () => void;
 

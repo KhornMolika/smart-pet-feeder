@@ -6,7 +6,8 @@ export interface FeederDevice {
   id: string;
   name: string;
   petName: string;
-  petEmoji: string;
+  petEmoji?: string;
+  petIcon?: string;
   room: string;
   isOnline: boolean;
   rtcValid: boolean;
@@ -18,12 +19,15 @@ export interface FeederDevice {
   todayMealsServed?: number;
   todayMealsTarget?: number;
   customPresets?: PortionPreset[];
+  isAwayMode?: boolean;
+  claimToken?: string;
 }
 
 export interface PortionPreset {
   id: 'snack' | 'bowl' | 'feast';
   name: string;
-  emoji: string;
+  emoji?: string;
+  icon?: string;
   durationMs: number;
   labelSeconds: string;
   description: string;
@@ -60,3 +64,15 @@ export interface DeviceSettings {
   cooldownSeconds: number;
   maxFeedsPerDay: number;
 }
+
+export interface DeviceMember {
+  id: string;
+  deviceId: string;
+  userId: string;
+  userName: string;
+  role: 'owner' | 'family' | 'guest';
+  avatarEmoji?: string;
+  telegramId?: number;
+  createdAt: string;
+}
+

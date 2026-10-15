@@ -2,14 +2,15 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FeederDevice, FeedingEvent } from '@/types/feeder.types';
-import { playPetFeedingChime } from '@/lib/utils/audio.util';
-import { triggerHaptic, triggerNotificationHaptic } from '@/lib/utils/telegram.util';
+import { playToneSound } from '@/lib/utils/audio.util';
+import { triggerHaptic, triggerNotificationHaptic, getStoredNotificationConfig } from '@/lib/utils/telegram.util';
+import { formatDuration } from '@/lib/utils/date.util';
 
 export function useDeviceFeed(
   activeDevice: FeederDevice,
   onFeedSuccess?: (event: FeedingEvent) => void
 ) {
-  const [selectedDurationMs, setSelectedDurationMs] = useState<number>(1800);
+  const [selectedDurationMs, setSelectedDurationMs] = useState<number>(60000);
   const [isDispensing, setIsDispensing] = useState<boolean>(false);
   const [actuationRemainingMs, setActuationRemainingMs] = useState<number>(0);
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
@@ -47,12 +48,18 @@ export function useDeviceFeed(
     setActuationRemainingMs(0);
     triggerNotificationHaptic('success');
 
-    // 1. Play pet alert sound chime
-    playPetFeedingChime();
+    const notifConfig = getStoredNotificationConfig();
 
-    // 2. User notification toast
-    const toastMsg = `🎉 ${activeDevice.petName} received food (${(duration / 1000).toFixed(1)}s actuation)`;
-    setNotificationToast(toastMsg);
+    // 1. Play pet alert sound tone if enabled in settings and set to play 'after' food drops
+    if (notifConfig.soundChimeEnabled && notifConfig.soundTiming === 'after') {
+      playToneSound(notifConfig.soundToneId || 'gentle_chime', notifConfig.soundRepeatCount || 2);
+    }
+
+    // 2. User notification toast if meal alert is enabled
+    if (notifConfig.mealServedAlert) {
+      const toastMsg = `${activeDevice.petName} received food (${formatDuration(duration)})`;
+      setNotificationToast(toastMsg);
+    }
 
     // 3. Create feeding event record
     const now = Date.now();
@@ -88,10 +95,18 @@ export function useDeviceFeed(
     setActuationRemainingMs(duration);
     setNotificationToast(null);
 
+    const notifConfig = getStoredNotificationConfig();
+
+    // Play pet alert melody immediately if set to play 'before' food drops (classical Pavlovian call)
+    if (notifConfig.soundChimeEnabled && (notifConfig.soundTiming === 'before' || !notifConfig.soundTiming)) {
+      playToneSound(notifConfig.soundToneId || 'gentle_chime', notifConfig.soundRepeatCount || 2);
+    }
+
     const startTime = Date.now();
     const intervalStep = 50;
 
-    // Countdown loop for servo gate actuation
+
+    // Countdown loop for food dispensing
     countdownIntervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const remaining = Math.max(0, duration - elapsed);

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 const DispenseRequestSchema = z.object({
   deviceId: z.string().min(1),
-  durationMs: z.number().min(300).max(5000),
+  durationMs: z.number().min(300).max(300000),
 });
 
 export async function POST(req: NextRequest) {
@@ -22,10 +22,11 @@ export async function POST(req: NextRequest) {
     const backendUrl = process.env.BACKEND_INTERNAL_URL || 'http://localhost:3001';
 
     try {
-      const response = await fetch(`${backendUrl}/api/feeder/${deviceId}/dispense`, {
+      const response = await fetch(`${backendUrl}/api/v1/devices/${deviceId}/feed`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-bff-source': 'NextJS-AppRouter',
         },
         body: JSON.stringify({ durationMs }),
         // Abort quickly if backend offline

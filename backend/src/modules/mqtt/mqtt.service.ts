@@ -23,6 +23,8 @@ export interface DeviceStatePayload {
   state: string;
   rtcValid: boolean;
   uptimeSeconds: number;
+  hopperPercent?: number;
+  foodDistanceCm?: number;
   rtcTime?: string;
 }
 

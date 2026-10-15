@@ -8,6 +8,7 @@ import {
   OneToMany,
 } from 'typeorm';
 import { DeviceSettings } from './device-settings.entity.js';
+import { DeviceMember } from './device-member.entity.js';
 import { FeedingSchedule } from '../../feeder/entities/feeding-schedule.entity.js';
 import { FeedingEvent } from '../../feeder/entities/feeding-event.entity.js';
 
@@ -21,6 +22,24 @@ export class Device {
 
   @Column({ name: 'owner_id', type: 'varchar', length: 64, default: 'owner_bff_user' })
   ownerId: string;
+
+  @Column({ name: 'pet_name', type: 'varchar', length: 64, default: 'Mochi' })
+  petName: string;
+
+  @Column({ name: 'pet_emoji', type: 'varchar', length: 32, default: 'cat' })
+  petEmoji: string;
+
+  @Column({ type: 'varchar', length: 64, default: 'Living Room' })
+  room: string;
+
+  @Column({ name: 'claim_token', type: 'varchar', length: 64, nullable: true })
+  claimToken: string | null;
+
+  @Column({ name: 'is_claimed', type: 'boolean', default: false })
+  isClaimed: boolean;
+
+  @Column({ name: 'claimed_at', type: 'datetime', nullable: true })
+  claimedAt: Date | null;
 
   @Column({ name: 'last_seen_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
   lastSeenAt: Date;
@@ -37,6 +56,12 @@ export class Device {
   @Column({ name: 'is_online', type: 'boolean', default: true })
   isOnline: boolean;
 
+  @Column({ name: 'hopper_percent', type: 'int', default: 80 })
+  hopperPercent: number;
+
+  @Column({ name: 'food_distance_cm', type: 'float', nullable: true })
+  foodDistanceCm: number | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 
@@ -51,4 +76,7 @@ export class Device {
 
   @OneToMany(() => FeedingEvent, (event) => event.device)
   events: FeedingEvent[];
+
+  @OneToMany('DeviceMember', (member: DeviceMember) => member.device)
+  members: DeviceMember[];
 }

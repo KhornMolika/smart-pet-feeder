@@ -21,8 +21,8 @@ describe('FeedSafetyHelper (Zero-Mock Unit Tests)', () => {
       expect(res.reason).toContain('below hardware minimum');
     });
 
-    it('should reject and clamp duration exceeding safety cap (6000ms > 5000ms)', () => {
-      const res = validateDurationBounds(6000);
+    it('should reject and clamp duration exceeding safety cap (200000ms > 180000ms)', () => {
+      const res = validateDurationBounds(200000);
       expect(res.valid).toBe(false);
       expect(res.clampedDuration).toBe(DEFAULT_SAFETY.maxDurationMs);
       expect(res.reason).toContain('exceeds hardware safety cap');
