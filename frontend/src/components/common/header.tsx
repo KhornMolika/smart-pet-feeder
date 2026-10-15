@@ -41,13 +41,13 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
         <Image
           src="/images/logo.png"
           alt="ចិញ្ចឹម (ChinChem)"
-          width={60}
-          height={24}
+          width={45}
+          height={26}
           priority
           style={{ width: 'auto', height: 'auto' }}
-          className="h-6 sm:h-9 w-auto object-contain shrink-0"
+          className="h-6 sm:h-[26px] w-auto object-contain shrink-0 filter drop-shadow-[0_1px_2px_rgba(20,53,3,0.07)] transition-transform hover:scale-105"
         />
-        <span className="text-xs font-black tracking-wider text-[#143503]/70 uppercase hidden xs:inline">
+        <span className="text-xs font-black tracking-wider text-[#143503]/75 uppercase hidden xs:inline tracking-widest">
           ChinChem
         </span>
       </div>

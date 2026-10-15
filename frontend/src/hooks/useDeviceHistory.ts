@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { FeedingEvent, FeedSource } from '@/types/feeder.types';
+import { FeedingEvent, FeedSource, ActuationStatus } from '@/types/feeder.types';
 import { INITIAL_HISTORY } from '@/lib/constants/feeder.constants';
 import { isSameDay, formatDateOnly } from '@/lib/utils/date.util';
 
@@ -54,17 +54,25 @@ export function useDeviceHistory() {
             setHistory((prev) => {
               const mapped: FeedingEvent[] = data.map((evt: any) => {
                 const dateObj = new Date(evt.startedAt || evt.completedAt || Date.now());
+                const startedAtStr = evt.startedAt || dateObj.toISOString();
+                let source: FeedSource = 'manual_app';
+                if (evt.source === 'button' || evt.source === 'physical_button') {
+                  source = 'physical_button';
+                } else if (evt.source === 'schedule' || evt.source === 'scheduled') {
+                  source = 'scheduled';
+                }
+                const status: ActuationStatus =
+                  evt.status === 'completed' || evt.actuationCompleted ? 'completed' : 'failed';
                 return {
                   id: evt.id || `evt-${evt.commandId || Date.now()}`,
                   deviceId: evt.deviceId || 'feeder_esp32_01',
-                  time: dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  date: dateObj.toISOString().split('T')[0],
-                  portion: `${Math.round((evt.durationMs || 1500) / 1000)}s treat (${evt.durationMs || 1500}ms)`,
-                  source: (evt.source === 'button' ? 'button' : evt.source === 'schedule' ? 'schedule' : 'app') as FeedSource,
-                  status: (evt.status === 'completed' || evt.actuationCompleted ? 'completed' : 'failed') as any,
-                  rawTimestamp: evt.startedAt || new Date().toISOString(),
+                  deviceName: evt.deviceName || 'Feeder Device',
+                  source,
+                  status,
+                  startedAt: startedAtStr,
+                  completedAt: evt.completedAt,
                   durationMs: evt.durationMs || 1500,
-                  note: evt.note || (evt.source === 'button' ? 'Physical button pressed on feeder' : 'Dispensed'),
+                  note: evt.note || (source === 'physical_button' ? 'Physical button pressed on feeder' : 'Dispensed'),
                 };
               });
 
