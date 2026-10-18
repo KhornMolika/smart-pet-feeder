@@ -12,6 +12,7 @@ services:
       # Enable Docker provider
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=chinchem-net"
       # Entrypoints
       - "--entrypoints.web.address=:80"
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
@@ -50,6 +51,7 @@ services:
       - NEXT_PUBLIC_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-ChinChemBot}
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=chinchem-net"
       # Route all web traffic to Next.js
       - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-feeder.example.com}`)"
       - "traefik.http.routers.frontend.entrypoints=websecure"
@@ -89,8 +91,9 @@ services:
       - CORS_ORIGIN=https://${DOMAIN:-feeder.example.com}
     labels:
       - "traefik.enable=true"
-      # Route /api/* requests to NestJS backend with higher priority
-      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-feeder.example.com}`) && PathPrefix(`/api`)"
+      - "traefik.docker.network=chinchem-net"
+      # Route /api/* and /health requests to NestJS backend with higher priority
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-feeder.example.com}`) && (PathPrefix(`/api`) || PathPrefix(`/health`))"
       - "traefik.http.routers.backend.entrypoints=websecure"
       - "traefik.http.routers.backend.tls=true"
       - "traefik.http.routers.backend.tls.certresolver=myresolver"

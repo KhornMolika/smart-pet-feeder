@@ -41,8 +41,8 @@ async function bootstrap() {
   // Graceful Shutdown Hooks
   app.enableShutdownHooks();
 
-  await app.listen(port);
-  logger.log(`🐾 Smart Pet Feeder NestJS API running on: http://localhost:${port}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`🐾 Smart Pet Feeder NestJS API running on: http://0.0.0.0:${port}`);
 }
 
 bootstrap();

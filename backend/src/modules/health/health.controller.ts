@@ -5,7 +5,7 @@ import {
   TypeOrmHealthIndicator,
 } from '@nestjs/terminus';
 
-@Controller('health')
+@Controller(['health', 'api/health', 'api/v1/health'])
 export class HealthController {
   constructor(
     private health: HealthCheckService,
