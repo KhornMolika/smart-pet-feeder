@@ -56,7 +56,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Stage 2: SSH Deploy to AWS EC2 Instance (Pull Pre-built Images Only)
+  # Stage 2: SSH Deploy to AWS EC2 Instance (Native OpenSSH SCP & SSH)
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to AWS EC2
