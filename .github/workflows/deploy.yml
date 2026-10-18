@@ -83,37 +83,32 @@ jobs:
       - name: Execute Deployment Commands via SSH
         run: |
           ssh -o StrictHostKeyChecking=no -p ${{ secrets.SERVER_PORT || 22 }} \
-            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-            set -e
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} 'bash -se' << 'EOF'
+          cd /home/ubuntu
+          echo "📂 [Deploy] Current Directory: $(pwd)"
 
-            cd /home/ubuntu
-            echo "📂 [Deploy] Current Directory: $(pwd)"
+          # Ensure mosquitto config exists without overwriting locked permissions
+          if [ ! -f mosquitto/config/mosquitto.conf ]; then
+            mkdir -p mosquitto/config
+            printf 'listener 1883\nallow_anonymous true\n' > mosquitto/config/mosquitto.conf
+          fi
 
-            # Ensure mosquitto config exists without overwriting locked permissions
-            if [ ! -f mosquitto/config/mosquitto.conf ]; then
-              mkdir -p mosquitto/config
-              cat << 'MCONF' > mosquitto/config/mosquitto.conf
-listener 1883
-allow_anonymous true
-MCONF
-            fi
+          # Check if .env is present
+          if [ ! -f .env ]; then
+            echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are configured."
+          fi
 
-            # Check if .env is present
-            if [ ! -f .env ]; then
-              echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are configured."
-            fi
+          # Pull newly pushed pre-built images from Docker Hub
+          echo "🐳 [Deploy] Pulling pre-built images from Docker Hub..."
+          docker compose -f docker-compose.traefik.yml pull backend frontend traefik
 
-            # Pull newly pushed pre-built images from Docker Hub
-            echo "🐳 [Deploy] Pulling pre-built images from Docker Hub..."
-            docker compose -f docker-compose.traefik.yml pull backend frontend traefik
+          # Re-create updated containers with zero downtime
+          echo "🔄 [Deploy] Updating services..."
+          docker compose -f docker-compose.traefik.yml up -d --remove-orphans
 
-            # Re-create updated containers with zero downtime
-            echo "🔄 [Deploy] Updating services..."
-            docker compose -f docker-compose.traefik.yml up -d --remove-orphans
+          # Clean up old unused images to save disk space
+          echo "🧹 [Deploy] Cleaning up old dangling images..."
+          docker image prune -f
 
-            # Clean up old unused images to save disk space
-            echo "🧹 [Deploy] Cleaning up old dangling images..."
-            docker image prune -f
-
-            echo "✅ [Deploy] Deployment completed successfully!"
+          echo "✅ [Deploy] Deployment completed successfully!"
           EOF
