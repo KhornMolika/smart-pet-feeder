@@ -55,14 +55,27 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ---------------------------------------------------------------------------
-  # Stage 2: SSH Deploy to AWS EC2 Instance
+  # Stage 2: SSH Deploy to AWS EC2 Instance (Pull Pre-built Images Only)
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy to AWS EC2
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy Stack via SSH
+      - name: Checkout Compose & Config Files
+        uses: actions/checkout@v4
+
+      - name: Copy Compose and Config to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: "docker-compose.traefik.yml,mosquitto/config/mosquitto.conf"
+          target: "/home/ubuntu"
+
+      - name: Pull Images and Update Containers via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -73,44 +86,24 @@ jobs:
           script: |
             set -e
 
-            echo "🚀 [Deploy] Connecting to host $(hostname)..."
-
-            # Determine project directory
-            DEPLOY_DIR="${{ secrets.SERVER_DEPLOY_PATH || 'smart-pet-feeder' }}"
-            if [ -d "$HOME/$DEPLOY_DIR/.git" ]; then
-              cd "$HOME/$DEPLOY_DIR"
-            elif [ -d "$HOME/.git" ]; then
-              cd "$HOME"
-            elif [ -f "$HOME/docker-compose.traefik.yml" ]; then
-              cd "$HOME"
-            else
-              mkdir -p "$HOME/$DEPLOY_DIR"
-              cd "$HOME/$DEPLOY_DIR"
-              git clone https://github.com/KhornMolika/smart-pet-feeder.git .
-            fi
-
+            cd /home/ubuntu
             echo "📂 [Deploy] Working in directory: $(pwd)"
 
-            # If inside a git repo, pull the latest compose configs
-            if [ -d ".git" ]; then
-              echo "📥 [Deploy] Pulling latest git changes..."
-              git fetch origin main
-              git reset --hard origin/main
-            else
-              echo "📥 [Deploy] Downloading updated docker-compose.traefik.yml..."
-              curl -fsSL https://raw.githubusercontent.com/KhornMolika/smart-pet-feeder/main/docker-compose.traefik.yml -o docker-compose.traefik.yml
+            # Check if .env is present
+            if [ ! -f .env ]; then
+              echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are set."
             fi
 
-            # Pull newly pushed images from Docker Hub
-            echo "🐳 [Deploy] Pulling updated container images..."
+            # Pull newly pushed pre-built images from Docker Hub
+            echo "🐳 [Deploy] Pulling pre-built images from Docker Hub..."
             docker compose -f docker-compose.traefik.yml pull backend frontend traefik
 
-            # Re-create containers with zero unnecessary downtime
+            # Re-create updated containers with zero downtime
             echo "🔄 [Deploy] Updating services..."
             docker compose -f docker-compose.traefik.yml up -d --remove-orphans
 
             # Clean up old unused images to save disk space
-            echo "🧹 [Deploy] Cleaning up old images..."
+            echo "🧹 [Deploy] Cleaning up old dangling images..."
             docker image prune -f
 
             echo "✅ [Deploy] Deployment completed successfully!"
