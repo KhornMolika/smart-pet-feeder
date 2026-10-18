@@ -1,0 +1,116 @@
+name: CI/CD Pipeline & Automated Deployment
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1: Build Docker Images & Push to Docker Hub
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    name: Build & Push Docker Images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/chinchem-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/chinchem-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & Push Frontend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/chinchem-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/chinchem-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: SSH Deploy to AWS EC2 Instance
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to AWS EC2
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Stack via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -e
+
+            echo "🚀 [Deploy] Connecting to host $(hostname)..."
+
+            # Determine project directory
+            DEPLOY_DIR="${{ secrets.SERVER_DEPLOY_PATH || 'smart-pet-feeder' }}"
+            if [ -d "$HOME/$DEPLOY_DIR/.git" ]; then
+              cd "$HOME/$DEPLOY_DIR"
+            elif [ -d "$HOME/.git" ]; then
+              cd "$HOME"
+            elif [ -f "$HOME/docker-compose.traefik.yml" ]; then
+              cd "$HOME"
+            else
+              mkdir -p "$HOME/$DEPLOY_DIR"
+              cd "$HOME/$DEPLOY_DIR"
+              git clone https://github.com/KhornMolika/smart-pet-feeder.git .
+            fi
+
+            echo "📂 [Deploy] Working in directory: $(pwd)"
+
+            # If inside a git repo, pull the latest compose configs
+            if [ -d ".git" ]; then
+              echo "📥 [Deploy] Pulling latest git changes..."
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              echo "📥 [Deploy] Downloading updated docker-compose.traefik.yml..."
+              curl -fsSL https://raw.githubusercontent.com/KhornMolika/smart-pet-feeder/main/docker-compose.traefik.yml -o docker-compose.traefik.yml
+            fi
+
+            # Pull newly pushed images from Docker Hub
+            echo "🐳 [Deploy] Pulling updated container images..."
+            docker compose -f docker-compose.traefik.yml pull backend frontend traefik
+
+            # Re-create containers with zero unnecessary downtime
+            echo "🔄 [Deploy] Updating services..."
+            docker compose -f docker-compose.traefik.yml up -d --remove-orphans
+
+            # Clean up old unused images to save disk space
+            echo "🧹 [Deploy] Cleaning up old images..."
+            docker image prune -f
+
+            echo "✅ [Deploy] Deployment completed successfully!"
