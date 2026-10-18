@@ -3,9 +3,11 @@ services:
   # Traefik v3 Edge Router & Automatic Let's Encrypt SSL
   # ---------------------------------------------------------------------------
   traefik:
-    image: traefik:v3.2
+    image: traefik:v3
     container_name: chinchem-traefik
     restart: unless-stopped
+    environment:
+      - DOCKER_API_VERSION=1.44
     command:
       # Enable Docker provider
       - "--providers.docker=true"
