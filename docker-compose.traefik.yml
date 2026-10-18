@@ -4,7 +4,7 @@ services:
   # ---------------------------------------------------------------------------
   traefik:
     image: traefik:v3.2
-    container_name: pet-feeder-traefik
+    container_name: chinchem-traefik
     restart: unless-stopped
     command:
       # Enable Docker provider
@@ -39,7 +39,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: pet-feeder-frontend
+    container_name: chinchem-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -68,7 +68,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: pet-feeder-backend
+    container_name: chinchem-backend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -107,7 +107,7 @@ services:
   # ---------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
-    container_name: pet-feeder-postgres
+    container_name: chinchem-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE_USER:-feeder}
@@ -128,7 +128,7 @@ services:
   # ---------------------------------------------------------------------------
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: pet-feeder-mosquitto
+    container_name: chinchem-mosquitto
     restart: unless-stopped
     ports:
       - "1883:1883"

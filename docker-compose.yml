@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: pet-feeder-postgres
+    container_name: chinchem-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DATABASE_USER:-feeder}
@@ -19,7 +19,7 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:2
-    container_name: pet-feeder-mosquitto
+    container_name: chinchem-mosquitto
     restart: unless-stopped
     ports:
       - "1883:1883"
