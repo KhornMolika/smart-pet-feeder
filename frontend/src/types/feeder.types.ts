@@ -15,7 +15,6 @@ export interface FeederDevice {
   lastSeenAt: string;
   nextScheduledFeedAt?: string | null;
   lastFeedAt?: string | null;
-  hopperPercent?: number;
   todayMealsServed?: number;
   todayMealsTarget?: number;
   customPresets?: PortionPreset[];

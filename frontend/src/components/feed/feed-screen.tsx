@@ -30,7 +30,6 @@ export function FeedScreen(props: FeedScreenProps = {}) {
   const [countdownText, setCountdownText] = useState<string>('in 2h 15m');
   const [lastFeedText, setLastFeedText] = useState<string>('45m ago');
   const [nextMealTimeDisplay, setNextMealTimeDisplay] = useState<string>('6:30 PM');
-  const [refillToast, setRefillToast] = useState<boolean>(false);
   const [scheduledMealsCount, setScheduledMealsCount] = useState<number>(0);
   const [manualMealsCount, setManualMealsCount] = useState<number>(0);
   const [todayMealsServedCount, setTodayMealsServedCount] = useState<number>(activeDevice.todayMealsServed ?? 0);
@@ -106,13 +105,6 @@ export function FeedScreen(props: FeedScreenProps = {}) {
     context.recordDispense(activeDevice.id, event.durationMs);
   };
 
-  const handleRefillTank = () => {
-    triggerHaptic('medium');
-    context.refillHopper(activeDevice.id);
-    setRefillToast(true);
-    setTimeout(() => setRefillToast(false), 3000);
-  };
-
   const {
     selectedDurationMs,
     setSelectedDurationMs,
@@ -130,16 +122,6 @@ export function FeedScreen(props: FeedScreenProps = {}) {
     setActivePresetId(preset.id);
     setSelectedDurationMs(preset.durationMs);
   };
-
-  // Dynamic Food Storage Metrics
-  const hopperPercent = activeDevice.hopperPercent ?? 65;
-  const daysRemaining = Math.max(1, Math.round(hopperPercent / 13));
-  const hopperStatus =
-    hopperPercent >= 50
-      ? { label: 'Good', badgeCls: 'bg-[#A7D1AE]/45 text-[#143503] border-[#143503]/15', barCls: 'bg-gradient-to-r from-[#143503] via-[#245308] to-[#4B633E]' }
-      : hopperPercent >= 25
-      ? { label: 'Moderate', badgeCls: 'bg-amber-100 text-amber-900 border-amber-300', barCls: 'bg-gradient-to-r from-amber-600 to-amber-500' }
-      : { label: 'Low Food', badgeCls: 'bg-rose-100 text-rose-900 border-rose-300 animate-pulse', barCls: 'bg-gradient-to-r from-rose-600 to-rose-500' };
 
   // Dynamic Today's Meals Metrics
   const todayMealsServed = todayMealsServedCount;
@@ -185,14 +167,9 @@ export function FeedScreen(props: FeedScreenProps = {}) {
         onSkipCooldown={skipCooldown}
       />
 
-      {/* 3. Food Storage & Daily Meals Card */}
+      {/* 3. Daily Feeding Goals Card */}
       <FoodStorageAndGoalsCard
         activeDevice={activeDevice}
-        refillToast={refillToast}
-        onRefillTank={handleRefillTank}
-        hopperPercent={hopperPercent}
-        daysRemaining={daysRemaining}
-        hopperStatus={hopperStatus}
         todayMealsServed={todayMealsServed}
         todayMealsTarget={todayMealsTarget}
         mealsRemaining={mealsRemaining}

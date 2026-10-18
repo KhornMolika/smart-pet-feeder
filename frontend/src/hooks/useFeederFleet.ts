@@ -66,7 +66,6 @@ export function useFeederFleet() {
       rtcValid: true,
       wifiRssi: -60,
       lastSeenAt: new Date().toISOString(),
-      hopperPercent: 100,
       todayMealsServed: 0,
       todayMealsTarget: 3,
       customPresets: DEFAULT_PORTION_PRESETS,
@@ -115,22 +114,13 @@ export function useFeederFleet() {
     saveDevices(updated);
   };
 
-  const refillHopper = (deviceId: string) => {
-    const updated = devices.map((d) => (d.id === deviceId ? { ...d, hopperPercent: 100 } : d));
-    saveDevices(updated);
-  };
-
-  const recordDispense = (deviceId: string, durationMs: number = 60000) => {
-    const drop = Math.max(2, Math.round((durationMs / 60000) * 5));
+  const recordDispense = (deviceId: string, _durationMs: number = 60000) => {
     const nowIso = new Date().toISOString();
     const updated = devices.map((d) => {
       if (d.id !== deviceId) return d;
-      const currentHopper = d.hopperPercent ?? 80;
-      const newHopper = Math.max(0, currentHopper - drop);
       const currentMeals = d.todayMealsServed ?? 0;
       return {
         ...d,
-        hopperPercent: newHopper,
         todayMealsServed: currentMeals + 1,
         lastFeedAt: nowIso,
       };
@@ -190,7 +180,6 @@ export function useFeederFleet() {
     updateDevicePresets,
     updateDeviceTarget,
     updateDeviceNextScheduledFeedAt,
-    refillHopper,
     recordDispense,
   };
 }

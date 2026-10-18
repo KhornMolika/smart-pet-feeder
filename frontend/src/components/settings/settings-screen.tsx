@@ -88,14 +88,13 @@ export function SettingsScreen(props: SettingsScreenProps = {}) {
     });
   };
 
-  const handleSendTestAlert = (eventType: 'meal_served' | 'low_food' | 'food_jam') => {
+  const handleSendTestAlert = (eventType: 'meal_served' | 'food_jam') => {
     triggerHaptic('medium');
     const msg = formatTelegramBotAlert(eventType, {
       petName: activeDevice.petName,
       room: activeDevice.room,
       mealName: 'Morning Breakfast',
       duration: '1m',
-      hopperPercent: activeDevice.hopperPercent ?? 80,
     });
     setTestAlertToast(msg);
     setTimeout(() => setTestAlertToast(null), 4000);

@@ -56,12 +56,6 @@ export class Device {
   @Column({ name: 'is_online', type: 'boolean', default: true })
   isOnline: boolean;
 
-  @Column({ name: 'hopper_percent', type: 'int', default: 80 })
-  hopperPercent: number;
-
-  @Column({ name: 'food_distance_cm', type: 'float', nullable: true })
-  foodDistanceCm: number | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 

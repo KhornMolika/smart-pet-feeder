@@ -17,8 +17,8 @@ Looking directly at the ESP32 board with the micro-USB connector pointing **DOWN
                    ── 3 │ VP (GPIO36)     GPIO23 │ 28 ── DS1302 CLK
                    ── 4 │ VN (GPIO39)     GPIO22 │ 27 ── I2C LCD SCL
                    ── 5 │ GPIO34          GPIO1  │ 26 ── TX0 (USB Serial)
-    HC-SR04 ECHO ──── 6 │ GPIO35          GPIO3  │ 25 ── RX0 (USB Serial)
-    HC-SR04 TRIG ──── 7 │ GPIO32          GPIO21 │ 24 ── I2C LCD SDA
+                   ── 6 │ GPIO35          GPIO3  │ 25 ── RX0 (USB Serial)
+                   ── 7 │ GPIO32          GPIO21 │ 24 ── I2C LCD SDA
                    ── 8 │ GPIO33          GPIO19 │ 23 ── DS1302 DAT
    Active Buzzer ──── 9 │ GPIO25          GPIO18 │ 22 ── SG90 Servo PWM
       DS1302 RST ─── 10 │ GPIO26           GPIO5 │ 21 ── (Spare)
@@ -43,10 +43,6 @@ Looking directly at the ESP32 board with the micro-USB connector pointing **DOWN
 | **16x2 I2C LCD** | SCL | Pin 27 | `GPIO 22` | `esp:D22` | 3.3V I²C | I²C Clock communication |
 | **16x2 I2C LCD** | VCC | Pin 30 | `VIN / 5V` | `esp:VIN` | 5V DC | LCD logic & backlight |
 | **16x2 I2C LCD** | GND | Pin 29 | `GND` | `esp:GND.1` | Ground | Common ground |
-| **HC-SR04 Sensor** | TRIG | Pin 7 | `GPIO 32` | `esp:D32` | 3.3V Output | 10µs ultrasonic trigger pulse |
-| **HC-SR04 Sensor** | ECHO | Pin 6 | `GPIO 35` | `esp:D35` | 3.3V Input | Echo pulse duration (depth) |
-| **HC-SR04 Sensor** | VCC | Pin 30 | `VIN / 5V` | `esp:VIN` | 5V DC | Ultrasonic transducer power |
-| **HC-SR04 Sensor** | GND | Pin 14 | `GND` | `esp:GND.2` | Ground | Common ground |
 | **Push Button** | Signal Leg | Pin 11 | `GPIO 27` | `esp:D27` | Active LOW | Manual feed trigger (`INPUT_PULLUP`) |
 | **Push Button** | Ground Leg | Pin 14 | `GND` | `esp:GND.2` | Ground | Switch to ground |
 | **Active Buzzer** | Positive (+) | Pin 9 | `GPIO 25` | `esp:D25` | 3.3V Output | Audio tones & melody chimes |
@@ -89,6 +85,4 @@ You have two easy ways to simulate this circuit:
 * **Using the ESP32 30P DEVKIT V1 Power Board**:
   * Plug your ESP32 firmly into the power board shield.
   * The power board breaks out every GPIO pin alongside dedicated **5V** (red) and **GND** (black/blue) pin headers.
-  * Connect the 5V and GND wires of the **Servo**, **LCD**, and **HC-SR04** directly to these power board rails.
-* **HC-SR04 Echo Level Protection**:
-  * The HC-SR04 Echo pin outputs 5V. While ESP32 GPIO 35 has internal protection, you can safely insert a **1kΩ resistor** in series between HC-SR04 ECHO and ESP32 GPIO 35.
+  * Connect the 5V and GND wires of the **Servo** and **LCD** directly to these power board rails.

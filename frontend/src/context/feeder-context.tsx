@@ -23,7 +23,6 @@ interface FeederContextType {
   updateDevicePresets: (deviceId: string, presets: PortionPreset[]) => void;
   updateDeviceTarget: (deviceId: string, target: number) => void;
   updateDeviceNextScheduledFeedAt: (deviceId: string, isoString: string | null) => void;
-  refillHopper: (deviceId: string) => void;
   recordDispense: (deviceId: string, durationMs?: number) => void;
 
   // History & Logs

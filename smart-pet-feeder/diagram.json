@@ -20,15 +20,6 @@
       }
     },
     {
-      "type": "wokwi-hc-sr04",
-      "id": "ultrasonic",
-      "top": -140,
-      "left": -320,
-      "attrs": {
-        "distance": "6"
-      }
-    },
-    {
       "type": "wokwi-servo",
       "id": "servo",
       "top": 80,
@@ -68,11 +59,6 @@
     }
   ],
   "connections": [
-    [ "ultrasonic:VCC", "esp:VIN", "red", [ "v0" ] ],
-    [ "ultrasonic:GND", "esp:GND.2", "black", [ "v0" ] ],
-    [ "ultrasonic:TRIG", "esp:D32", "orange", [ "v0" ] ],
-    [ "ultrasonic:ECHO", "esp:D35", "green", [ "v0" ] ],
-
     [ "servo:V+", "esp:VIN", "red", [ "v0" ] ],
     [ "servo:GND", "esp:GND.1", "black", [ "v0" ] ],
     [ "servo:PWM", "esp:D18", "orange", [ "v0" ] ],

@@ -42,8 +42,6 @@ export class DevicesService implements OnModuleInit {
       await this.updateLastSeen(
         payload.deviceId,
         payload.online,
-        payload.hopperPercent,
-        payload.foodDistanceCm,
       );
     });
 
@@ -398,20 +396,12 @@ export class DevicesService implements OnModuleInit {
   private async updateLastSeen(
     deviceId: string,
     isOnline: boolean,
-    hopperPercent?: number,
-    foodDistanceCm?: number,
   ) {
     try {
       const updateData: Record<string, unknown> = {
         lastSeenAt: new Date(),
         isOnline,
       };
-      if (typeof hopperPercent === 'number') {
-        updateData.hopperPercent = hopperPercent;
-      }
-      if (typeof foodDistanceCm === 'number') {
-        updateData.foodDistanceCm = foodDistanceCm;
-      }
       await this.deviceRepository.update({ id: deviceId }, updateData);
     } catch {
       // Ignored if device doesn't exist yet

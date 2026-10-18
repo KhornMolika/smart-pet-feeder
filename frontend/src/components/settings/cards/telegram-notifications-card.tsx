@@ -7,7 +7,7 @@ import { Bell, Send, Check } from 'lucide-react';
 interface TelegramNotificationsCardProps {
   notifConfig: NotificationAlertConfig;
   onUpdateNotifConfig: (partial: Partial<NotificationAlertConfig>) => void;
-  onSendTestAlert: (eventType: 'meal_served' | 'low_food' | 'food_jam') => void;
+  onSendTestAlert: (eventType: 'meal_served' | 'food_jam') => void;
   testAlertToast: string | null;
 }
 
@@ -108,22 +108,6 @@ export function TelegramNotificationsCard({
                   notifConfig.mealServedAlert ? 'bg-[#143503] border-[#143503] text-white' : 'border-[#143503]/30 bg-white'
                 }`}>
                   {notifConfig.mealServedAlert && <Check size={11} strokeWidth={3} />}
-                </div>
-              </div>
-
-              {/* Sub-Event 2: Low Food & Empty Tank */}
-              <div
-                onClick={() => onUpdateNotifConfig({ lowFoodAlert: !notifConfig.lowFoodAlert })}
-                className="flex items-center justify-between p-2 rounded-xl bg-white/70 hover:bg-white border border-[#143503]/8 transition-colors cursor-pointer text-xs"
-              >
-                <div className="min-w-0 pr-2">
-                  <span className="font-semibold text-[#143503] block truncate">⚠️ Low Food & Empty Tank Alerts</span>
-                  <span className="text-[11px] text-[#4B633E] block truncate">Instant warning when food level drops below 20% or empty</span>
-                </div>
-                <div className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
-                  notifConfig.lowFoodAlert ? 'bg-[#143503] border-[#143503] text-white' : 'border-[#143503]/30 bg-white'
-                }`}>
-                  {notifConfig.lowFoodAlert && <Check size={11} strokeWidth={3} />}
                 </div>
               </div>
 

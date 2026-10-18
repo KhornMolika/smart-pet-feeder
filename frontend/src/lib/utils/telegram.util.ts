@@ -97,7 +97,6 @@ export function getTelegramInitData(): string | null {
 export interface NotificationAlertConfig {
   telegramEnabled: boolean;
   mealServedAlert: boolean;
-  lowFoodAlert: boolean;
   jamAndErrorAlert: boolean;
   physicalButtonAlert: boolean;
   dailyDigestAlert: boolean;
@@ -110,7 +109,6 @@ export interface NotificationAlertConfig {
 export const DEFAULT_NOTIFICATION_CONFIG: NotificationAlertConfig = {
   telegramEnabled: true,
   mealServedAlert: true,
-  lowFoodAlert: true,
   jamAndErrorAlert: true,
   physicalButtonAlert: true,
   dailyDigestAlert: false,
@@ -140,13 +138,12 @@ export function saveStoredNotificationConfig(config: NotificationAlertConfig) {
 }
 
 export function formatTelegramBotAlert(
-  eventType: 'meal_served' | 'low_food' | 'food_jam' | 'button_pressed' | 'daily_digest',
+  eventType: 'meal_served' | 'food_jam' | 'button_pressed' | 'daily_digest',
   data: {
     petName: string;
     room?: string;
     mealName?: string;
     duration?: string;
-    hopperPercent?: number;
     servedToday?: number;
     targetToday?: number;
   }
@@ -154,13 +151,11 @@ export function formatTelegramBotAlert(
   switch (eventType) {
     case 'meal_served':
       return `🍽️ Meal Served for ${data.petName}: ${data.mealName || 'Regular Meal'} (${data.duration || '1m'}) in ${data.room || 'Living Room'}`;
-    case 'low_food':
-      return `⚠️ Low Food Tank Warning: ${data.petName}'s hopper is down to ${data.hopperPercent ?? 15}%. Please refill dry kibble soon!`;
     case 'food_jam':
       return `🚨 Dispenser Jam Alert: Motor obstruction detected on ${data.petName}'s feeder (${data.room || 'Feeder'}). Food chute cleared.`;
     case 'button_pressed':
       return `🐾 Manual Feed Button: Someone pressed the physical feed button on ${data.petName}'s feeder in ${data.room || 'Living Room'}.`;
     case 'daily_digest':
-      return `📊 Daily Feeding Digest: ${data.petName} had ${data.servedToday ?? 3}/${data.targetToday ?? 3} meals today. Tank level is ${data.hopperPercent ?? 80}%.`;
+      return `📊 Daily Feeding Digest: ${data.petName} had ${data.servedToday ?? 3}/${data.targetToday ?? 3} meals today.`;
   }
 }
