@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DeviceMember } from '@/types/feeder.types';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 const STORAGE_KEY_MEMBERS_PREFIX = 'chinchum_device_members_';
 
@@ -34,7 +35,7 @@ export function useDeviceMembers(deviceId: string) {
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/v1/devices/${deviceId}/members`, {
+      const res = await fetch(`${getBackendApiUrl()}/api/v1/devices/${deviceId}/members`, {
         headers: { 'x-bff-source': 'NextJS-AppRouter' },
       });
 
@@ -76,7 +77,7 @@ export function useDeviceMembers(deviceId: string) {
   // Create an invitation link & token
   const createInvite = async (role: 'family' | 'guest') => {
     try {
-      const res = await fetch(`http://localhost:3001/api/v1/devices/${deviceId}/invite`, {
+      const res = await fetch(`${getBackendApiUrl()}/api/v1/devices/${deviceId}/invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,7 +113,7 @@ export function useDeviceMembers(deviceId: string) {
     } catch {}
 
     try {
-      await fetch(`http://localhost:3001/api/v1/devices/${deviceId}/members/${memberId}`, {
+      await fetch(`${getBackendApiUrl()}/api/v1/devices/${deviceId}/members/${memberId}`, {
         method: 'DELETE',
         headers: { 'x-bff-source': 'NextJS-AppRouter' },
       });

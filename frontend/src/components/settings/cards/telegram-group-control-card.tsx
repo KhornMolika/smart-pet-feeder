@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { FeederDevice } from '@/types/feeder.types';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
+import { getBackendApiUrl } from '@/lib/api-config';
 import {
   MessageSquare,
   Users,
@@ -99,7 +100,7 @@ export function TelegramGroupControlCard({
     setIsSendingMenu(true);
     try {
       await fetch(
-        `http://localhost:3001/api/v1/telegram/devices/${device.id}/send-group-menu`,
+        `${getBackendApiUrl()}/api/v1/telegram/devices/${device.id}/send-group-menu`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

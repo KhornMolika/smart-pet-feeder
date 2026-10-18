@@ -6,6 +6,7 @@ import { Header } from '@/components/common/header';
 import { BottomNav } from '@/components/common/bottom-nav';
 import { AddDeviceModal } from '@/components/devices/add-device-modal';
 import { getTelegramWebApp, getTelegramStartParam, triggerNotificationHaptic } from '@/lib/utils/telegram.util';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const {
@@ -43,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       triggerNotificationHaptic('success');
     } else if (startParam.startsWith('join_')) {
       // Auto-join shared feeder via invitation token
-      fetch('http://localhost:3001/api/v1/devices/join', {
+      fetch(`${getBackendApiUrl()}/api/v1/devices/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

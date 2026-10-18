@@ -1,0 +1,150 @@
+services:
+  # ---------------------------------------------------------------------------
+  # Traefik v3 Edge Router & Automatic Let's Encrypt SSL
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3.2
+    container_name: pet-feeder-traefik
+    restart: unless-stopped
+    command:
+      # Enable Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # Entrypoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      # Automated Let's Encrypt SSL (HTTP or TLS Challenge)
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL:-admin@example.com}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+      # Optional: Enable Dashboard on port 8080 (for local inspection)
+      - "--api.insecure=false"
+      - "--api.dashboard=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_acme:/letsencrypt
+    networks:
+      - feeder-net
+
+  # ---------------------------------------------------------------------------
+  # Next.js Frontend (Telegram Mini App)
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ${FRONTEND_IMAGE:-ampor/chinchem-frontend:latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pet-feeder-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - BACKEND_INTERNAL_URL=http://backend:3001
+      - NEXT_PUBLIC_API_URL=https://${DOMAIN:-feeder.example.com}/api/v1
+      - NEXT_PUBLIC_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-ChinChemBot}
+    labels:
+      - "traefik.enable=true"
+      # Route all web traffic to Next.js
+      - "traefik.http.routers.frontend.rule=Host(`${DOMAIN:-feeder.example.com}`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls=true"
+      - "traefik.http.routers.frontend.tls.certresolver=myresolver"
+      - "traefik.http.routers.frontend.priority=1"
+      - "traefik.http.services.frontend.loadbalancer.server.port=3000"
+    depends_on:
+      - backend
+    networks:
+      - feeder-net
+
+  # ---------------------------------------------------------------------------
+  # NestJS Backend API & Telegram Bot Webhook
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ${BACKEND_IMAGE:-ampor/chinchem-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pet-feeder-backend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DATABASE_TYPE=postgres
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_USER=${DATABASE_USER:-feeder}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-feeder_secret}
+      - DATABASE_NAME=${DATABASE_NAME:-smart_pet_feeder}
+      - DATABASE_SYNCHRONIZE=${DATABASE_SYNCHRONIZE:-true}
+      - MQTT_BROKER_URL=${MQTT_BROKER_URL:-mqtt://mosquitto:1883}
+      - MQTT_CLIENT_ID=pet_feeder_backend_server
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME:-ChinChemBot}
+      - CORS_ORIGIN=https://${DOMAIN:-feeder.example.com}
+    labels:
+      - "traefik.enable=true"
+      # Route /api/* requests to NestJS backend with higher priority
+      - "traefik.http.routers.backend.rule=Host(`${DOMAIN:-feeder.example.com}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls=true"
+      - "traefik.http.routers.backend.tls.certresolver=myresolver"
+      - "traefik.http.routers.backend.priority=100"
+      - "traefik.http.services.backend.loadbalancer.server.port=3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    networks:
+      - feeder-net
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: pet-feeder-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-feeder}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-feeder_secret}
+      POSTGRES_DB: ${DATABASE_NAME:-smart_pet_feeder}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-feeder} -d ${DATABASE_NAME:-smart_pet_feeder}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - feeder-net
+
+  # ---------------------------------------------------------------------------
+  # Eclipse Mosquitto MQTT Broker
+  # ---------------------------------------------------------------------------
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: pet-feeder-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/config/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - feeder-net
+
+networks:
+  feeder-net:
+    driver: bridge
+
+volumes:
+  traefik_acme:
+  postgres_data:
+  mosquitto_data:
+  mosquitto_log:

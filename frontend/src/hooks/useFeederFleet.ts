@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { FeederDevice, PortionPreset } from '@/types/feeder.types';
 import { INITIAL_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
 
+import { getBackendApiUrl } from '@/lib/api-config';
+
 const STORAGE_KEY_DEVICES = 'chinchum_fleet_devices';
 const STORAGE_KEY_ACTIVE_ID = 'chinchum_active_device_id';
 
@@ -77,7 +79,7 @@ export function useFeederFleet() {
 
     // Call backend claim endpoint if claimToken provided
     if (deviceData.claimToken) {
-      fetch('http://localhost:3001/api/v1/devices/claim', {
+      fetch(`${getBackendApiUrl()}/api/v1/devices/claim`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -180,7 +182,7 @@ export function useFeederFleet() {
     saveDevices(updated);
 
     // Persist to backend BFF
-    fetch(`http://localhost:3001/api/v1/devices/${deviceId}/group-settings`, {
+    fetch(`${getBackendApiUrl()}/api/v1/devices/${deviceId}/group-settings`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',

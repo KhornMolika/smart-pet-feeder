@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { FeedingEvent, FeedSource, ActuationStatus } from '@/types/feeder.types';
 import { INITIAL_HISTORY } from '@/lib/constants/feeder.constants';
 import { isSameDay, formatDateOnly } from '@/lib/utils/date.util';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 const STORAGE_KEY_HISTORY = 'chinchum_history';
 
@@ -44,7 +45,7 @@ export function useDeviceHistory() {
     let isSubscribed = true;
     async function loadBackendHistory() {
       try {
-        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+        const backendUrl = getBackendApiUrl();
         const res = await fetch(`${backendUrl}/api/v1/devices/feeder_esp32_01/events?limit=50`, {
           headers: { 'x-bff-source': 'NextJS-AppRouter' },
         });

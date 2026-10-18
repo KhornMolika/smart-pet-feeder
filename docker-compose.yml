@@ -4,15 +4,15 @@ services:
     container_name: pet-feeder-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: feeder
-      POSTGRES_PASSWORD: feeder_secret
-      POSTGRES_DB: smart_pet_feeder
+      POSTGRES_USER: ${DATABASE_USER:-feeder}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-feeder_secret}
+      POSTGRES_DB: ${DATABASE_NAME:-smart_pet_feeder}
     ports:
-      - "5433:5432"
+      - "${DATABASE_HOST_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U feeder -d smart_pet_feeder"]
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USER:-feeder} -d ${DATABASE_NAME:-smart_pet_feeder}"]
       interval: 10s
       timeout: 5s
       retries: 5

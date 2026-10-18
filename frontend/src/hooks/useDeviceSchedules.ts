@@ -25,9 +25,10 @@ export const DEFAULT_MEAL_PRESETS: DefaultMealSlot[] = [
   { timeLocal: '23:00', label: 'Bedtime Snack', durationMs: 30000, daysOfWeek: [1, 2, 3, 4, 5, 6, 0], priority: 8 },
 ];
 
-const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 export function useDeviceSchedules(deviceId: string) {
+  const backendUrl = getBackendApiUrl();
   const [allSchedules, setAllSchedules] = useState<FeedingSchedule[]>(INITIAL_SCHEDULES);
 
   // 1. Initial load from localStorage
