@@ -29,7 +29,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - traefik_acme:/letsencrypt
     networks:
-      - feeder-net
+      - chinchem-net
 
   # ---------------------------------------------------------------------------
   # Next.js Frontend (Telegram Mini App)
@@ -58,7 +58,7 @@ services:
     depends_on:
       - backend
     networks:
-      - feeder-net
+      - chinchem-net
 
   # ---------------------------------------------------------------------------
   # NestJS Backend API & Telegram Bot Webhook
@@ -100,7 +100,7 @@ services:
       mosquitto:
         condition: service_started
     networks:
-      - feeder-net
+      - chinchem-net
 
   # ---------------------------------------------------------------------------
   # PostgreSQL Database
@@ -121,7 +121,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - feeder-net
+      - chinchem-net
 
   # ---------------------------------------------------------------------------
   # Eclipse Mosquitto MQTT Broker
@@ -137,10 +137,10 @@ services:
       - mosquitto_data:/mosquitto/data
       - mosquitto_log:/mosquitto/log
     networks:
-      - feeder-net
+      - chinchem-net
 
 networks:
-  feeder-net:
+  chinchem-net:
     driver: bridge
 
 volumes:

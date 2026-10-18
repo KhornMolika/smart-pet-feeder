@@ -6,9 +6,8 @@ import {
   NotFoundException,
   OnModuleInit,
   Logger,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { FeedingSchedule } from './entities/feeding-schedule.entity.js';
@@ -40,9 +39,16 @@ export class FeederService implements OnModuleInit {
     private readonly eventRepository: Repository<FeedingEvent>,
     private readonly dataSource: DataSource,
     private readonly mqttService: MqttService,
-    @Inject(forwardRef(() => TelegramService))
-    private readonly telegramService: TelegramService,
+    private readonly moduleRef: ModuleRef,
   ) {}
+
+  private getTelegramService(): TelegramService | null {
+    try {
+      return this.moduleRef.get(TelegramService, { strict: false });
+    } catch {
+      return null;
+    }
+  }
 
   onModuleInit() {
     // Seed default schedules if none exist
@@ -152,8 +158,8 @@ export class FeederService implements OnModuleInit {
           .findOne({ where: { id: deviceId } })
           .then((dev) => {
             if (dev?.telegramGroupId) {
-              this.telegramService
-                .broadcastFeedEvent(dev, {
+              this.getTelegramService()
+                ?.broadcastFeedEvent(dev, {
                   source: 'manual_app',
                   durationMs: boundsCheck.clampedDuration,
                   requestedBy,
@@ -302,8 +308,8 @@ export class FeederService implements OnModuleInit {
           .getRepository(Device)
           .findOne({ where: { id: data.deviceId } });
         if (device?.telegramGroupId) {
-          await this.telegramService
-            .broadcastFeedEvent(device, {
+          await this.getTelegramService()
+            ?.broadcastFeedEvent(device, {
               source: data.source,
               durationMs: data.durationMs,
             })

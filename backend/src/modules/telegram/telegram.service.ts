@@ -1,4 +1,5 @@
-import { Injectable, Logger, forwardRef, Inject, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -24,8 +25,7 @@ export class TelegramService implements OnModuleInit {
     private readonly deviceRepository: Repository<Device>,
     @InjectRepository(DeviceMember)
     private readonly memberRepository: Repository<DeviceMember>,
-    @Inject(forwardRef(() => FeederService))
-    private readonly feederService: FeederService,
+    private readonly moduleRef: ModuleRef,
   ) {
     this.botToken = this.configService.get<string>('TELEGRAM_BOT_TOKEN', '');
     this.botUsername = this.configService.get<string>('TELEGRAM_BOT_USERNAME', 'ChinChemBot');
@@ -36,6 +36,14 @@ export class TelegramService implements OnModuleInit {
       this.logger.log(`Telegram Bot service initialized for @${this.botUsername}`);
     } else {
       this.logger.warn('TELEGRAM_BOT_TOKEN not configured. Running Telegram Bot in mock/simulation mode.');
+    }
+  }
+
+  private getFeederService(): FeederService | null {
+    try {
+      return this.moduleRef.get(FeederService, { strict: false });
+    } catch {
+      return null;
     }
   }
 
@@ -316,11 +324,14 @@ export class TelegramService implements OnModuleInit {
 
       try {
         // Trigger feed via FeederService
-        await this.feederService.triggerManualFeed(
-          deviceId,
-          { durationMs },
-          `telegram_group:${fromUser}`,
-        );
+        const feeder = this.getFeederService();
+        if (feeder) {
+          await feeder.triggerManualFeed(
+            deviceId,
+            { durationMs },
+            `telegram_group:${fromUser}`,
+          );
+        }
 
         // Immediate popup toast for the button clicker
         await this.answerCallbackQuery(query.id, `🐾 Dispensing ${label} for ${device.petName}!`);
