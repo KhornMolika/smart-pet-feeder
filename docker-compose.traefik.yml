@@ -39,9 +39,6 @@ services:
   # ---------------------------------------------------------------------------
   frontend:
     image: ${FRONTEND_IMAGE:-ampor/chinchem-frontend:latest}
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
     container_name: chinchem-frontend
     restart: unless-stopped
     environment:
@@ -69,9 +66,6 @@ services:
   # ---------------------------------------------------------------------------
   backend:
     image: ${BACKEND_IMAGE:-ampor/chinchem-backend:latest}
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     container_name: chinchem-backend
     restart: unless-stopped
     environment:

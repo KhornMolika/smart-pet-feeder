@@ -13,6 +13,7 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
+RUN pnpm prune --prod --ignore-scripts
 
 # Runner stage
 FROM node:20-alpine AS runner

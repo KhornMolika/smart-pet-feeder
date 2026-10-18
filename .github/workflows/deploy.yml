@@ -98,6 +98,11 @@ jobs:
             echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are configured."
           fi
 
+          # Free up disk space before pulling to prevent 'no space left on device'
+          echo "🧹 [Deploy] Freeing Docker build cache and unused images..."
+          docker system prune -af --volumes=false || true
+          docker builder prune -af || true
+
           # Pull newly pushed pre-built images from Docker Hub
           echo "🐳 [Deploy] Pulling pre-built images from Docker Hub..."
           docker compose -f docker-compose.traefik.yml pull backend frontend traefik
