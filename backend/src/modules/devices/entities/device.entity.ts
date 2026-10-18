@@ -56,6 +56,18 @@ export class Device {
   @Column({ name: 'is_online', type: 'boolean', default: true })
   isOnline: boolean;
 
+  @Column({ name: 'telegram_group_id', type: 'varchar', length: 64, nullable: true })
+  telegramGroupId: string | null;
+
+  @Column({ name: 'telegram_group_name', type: 'varchar', length: 128, nullable: true })
+  telegramGroupName: string | null;
+
+  @Column({ name: 'group_feed_enabled', type: 'boolean', default: true })
+  groupFeedEnabled: boolean;
+
+  @Column({ name: 'group_guest_feed_allowed', type: 'boolean', default: true })
+  groupGuestFeedAllowed: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 

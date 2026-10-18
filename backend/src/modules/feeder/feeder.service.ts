@@ -6,6 +6,8 @@ import {
   NotFoundException,
   OnModuleInit,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
@@ -17,6 +19,7 @@ import { TriggerFeedDto } from './dto/trigger-feed.dto.js';
 import { CreateScheduleDto } from './dto/create-schedule.dto.js';
 import { UpdateScheduleDto } from './dto/update-schedule.dto.js';
 import { MqttService } from '../mqtt/mqtt.service.js';
+import { TelegramService } from '../telegram/telegram.service.js';
 import {
   validateDurationBounds,
   isCooldownViolated,
@@ -37,6 +40,8 @@ export class FeederService implements OnModuleInit {
     private readonly eventRepository: Repository<FeedingEvent>,
     private readonly dataSource: DataSource,
     private readonly mqttService: MqttService,
+    @Inject(forwardRef(() => TelegramService))
+    private readonly telegramService: TelegramService,
   ) {}
 
   onModuleInit() {
@@ -139,6 +144,29 @@ export class FeederService implements OnModuleInit {
         command.id,
         boundsCheck.clampedDuration,
       );
+
+      // 5. Broadcast to linked Telegram Group (if not initiated from the group itself)
+      if (!requestedBy.startsWith('telegram_group')) {
+        manager
+          .getRepository(Device)
+          .findOne({ where: { id: deviceId } })
+          .then((dev) => {
+            if (dev?.telegramGroupId) {
+              this.telegramService
+                .broadcastFeedEvent(dev, {
+                  source: 'manual_app',
+                  durationMs: boundsCheck.clampedDuration,
+                  requestedBy,
+                })
+                .catch((err) =>
+                  this.logger.warn(`Failed to broadcast feed event: ${err.message}`),
+                );
+            }
+          })
+          .catch((err) =>
+            this.logger.warn(`Failed to load device for broadcast: ${err.message}`),
+          );
+      }
 
       return {
         id: command.id,
@@ -267,6 +295,23 @@ export class FeederService implements OnModuleInit {
       });
       await this.eventRepository.save(event);
       this.logger.log(`Persisted hardware event for ${data.deviceId} (${data.source})`);
+
+      // Broadcast hardware button or RTC schedule feeds to group chat
+      if (data.status === 'completed' && data.source !== 'manual_app') {
+        const device = await this.dataSource
+          .getRepository(Device)
+          .findOne({ where: { id: data.deviceId } });
+        if (device?.telegramGroupId) {
+          await this.telegramService
+            .broadcastFeedEvent(device, {
+              source: data.source,
+              durationMs: data.durationMs,
+            })
+            .catch((err) =>
+              this.logger.warn(`Failed to broadcast hardware feed event: ${err.message}`),
+            );
+        }
+      }
     } catch (err: unknown) {
       this.logger.error(`Failed to persist hardware event: ${(err as Error)?.message}`);
     }

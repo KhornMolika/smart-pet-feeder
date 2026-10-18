@@ -14,6 +14,7 @@ import { UpdateSettingsDto } from './dto/update-settings.dto.js';
 import { ClaimDeviceDto } from './dto/claim-device.dto.js';
 import { CreateInviteDto } from './dto/create-invite.dto.js';
 import { JoinDeviceDto } from './dto/join-device.dto.js';
+import { UpdateGroupSettingsDto } from './dto/update-group-settings.dto.js';
 import { MqttService } from '../mqtt/mqtt.service.js';
 import type { AuthenticatedUser } from '../../common/guards/telegram-auth.guard.js';
 
@@ -70,6 +71,10 @@ export class DevicesService implements OnModuleInit {
         timezone: 'Asia/Phnom_Penh',
         configVersion: 1,
         isOnline: true,
+        telegramGroupId: '-1002345678901',
+        telegramGroupName: "🐾 Mochi's Family Chat",
+        groupFeedEnabled: true,
+        groupGuestFeedAllowed: true,
       });
       await this.deviceRepository.save(device);
 
@@ -391,6 +396,26 @@ export class DevicesService implements OnModuleInit {
 
       return saved;
     });
+  }
+
+  async updateGroupSettings(
+    deviceId: string,
+    dto: UpdateGroupSettingsDto,
+  ): Promise<Device> {
+    const device = await this.getDevice(deviceId);
+    if (dto.telegramGroupId !== undefined) {
+      device.telegramGroupId = dto.telegramGroupId;
+    }
+    if (dto.telegramGroupName !== undefined) {
+      device.telegramGroupName = dto.telegramGroupName;
+    }
+    if (dto.groupFeedEnabled !== undefined) {
+      device.groupFeedEnabled = dto.groupFeedEnabled;
+    }
+    if (dto.groupGuestFeedAllowed !== undefined) {
+      device.groupGuestFeedAllowed = dto.groupGuestFeedAllowed;
+    }
+    return this.deviceRepository.save(device);
   }
 
   private async updateLastSeen(

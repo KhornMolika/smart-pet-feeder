@@ -1,4 +1,4 @@
-export type FeedSource = 'scheduled' | 'manual_app' | 'physical_button';
+export type FeedSource = 'scheduled' | 'manual_app' | 'physical_button' | 'telegram_group';
 
 export type ActuationStatus = 'pending' | 'in_progress' | 'completed' | 'failed' | 'timeout';
 
@@ -20,6 +20,10 @@ export interface FeederDevice {
   customPresets?: PortionPreset[];
   isAwayMode?: boolean;
   claimToken?: string;
+  telegramGroupId?: string | null;
+  telegramGroupName?: string | null;
+  groupFeedEnabled?: boolean;
+  groupGuestFeedAllowed?: boolean;
 }
 
 export interface PortionPreset {

@@ -20,6 +20,7 @@ export const envValidationSchema = Joi.object({
 
   // Telegram Bot integration
   TELEGRAM_BOT_TOKEN: Joi.string().allow('').default(''),
+  TELEGRAM_BOT_USERNAME: Joi.string().default('ChinChemBot'),
 
   // CORS whitelist
   CORS_ORIGIN: Joi.string().default('http://localhost:3000'),

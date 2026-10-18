@@ -54,6 +54,10 @@ export const INITIAL_DEVICES: FeederDevice[] = [
     todayMealsServed: 3,
     todayMealsTarget: 4,
     customPresets: DEFAULT_PORTION_PRESETS,
+    telegramGroupId: '-1002345678901',
+    telegramGroupName: "🐾 Mochi's Family Chat",
+    groupFeedEnabled: true,
+    groupGuestFeedAllowed: true,
   },
   {
     id: 'feeder-esp32-002',
@@ -71,6 +75,10 @@ export const INITIAL_DEVICES: FeederDevice[] = [
     todayMealsServed: 2,
     todayMealsTarget: 3,
     customPresets: DEFAULT_PORTION_PRESETS,
+    telegramGroupId: null,
+    telegramGroupName: null,
+    groupFeedEnabled: false,
+    groupGuestFeedAllowed: false,
   },
 ];
 

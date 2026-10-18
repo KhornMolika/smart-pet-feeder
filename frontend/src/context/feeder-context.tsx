@@ -24,6 +24,15 @@ interface FeederContextType {
   updateDeviceTarget: (deviceId: string, target: number) => void;
   updateDeviceNextScheduledFeedAt: (deviceId: string, isoString: string | null) => void;
   recordDispense: (deviceId: string, durationMs?: number) => void;
+  updateGroupSettings: (
+    deviceId: string,
+    settings: {
+      telegramGroupId?: string | null;
+      telegramGroupName?: string | null;
+      groupFeedEnabled?: boolean;
+      groupGuestFeedAllowed?: boolean;
+    },
+  ) => void;
 
   // History & Logs
   history: FeedingEvent[];

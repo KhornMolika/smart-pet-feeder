@@ -167,6 +167,31 @@ export function useFeederFleet() {
     saveDevices(updated);
   };
 
+  const updateGroupSettings = (
+    deviceId: string,
+    settings: {
+      telegramGroupId?: string | null;
+      telegramGroupName?: string | null;
+      groupFeedEnabled?: boolean;
+      groupGuestFeedAllowed?: boolean;
+    },
+  ) => {
+    const updated = devices.map((d) => (d.id === deviceId ? { ...d, ...settings } : d));
+    saveDevices(updated);
+
+    // Persist to backend BFF
+    fetch(`http://localhost:3001/api/v1/devices/${deviceId}/group-settings`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bff-source': 'NextJS-AppRouter',
+      },
+      body: JSON.stringify(settings),
+    }).catch(() => {
+      // Graceful fallback to local cache
+    });
+  };
+
   const activeDevice = devices.find((d) => d.id === activeDeviceId) || devices[0];
 
   return {
@@ -181,5 +206,6 @@ export function useFeederFleet() {
     updateDeviceTarget,
     updateDeviceNextScheduledFeedAt,
     recordDispense,
+    updateGroupSettings,
   };
 }

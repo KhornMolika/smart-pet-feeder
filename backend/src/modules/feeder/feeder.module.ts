@@ -1,14 +1,16 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FeedingSchedule } from './entities/feeding-schedule.entity.js';
 import { FeedCommand } from './entities/feed-command.entity.js';
 import { FeedingEvent } from './entities/feeding-event.entity.js';
 import { FeederService } from './feeder.service.js';
 import { FeederController } from './feeder.controller.js';
+import { TelegramModule } from '../telegram/telegram.module.js';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([FeedingSchedule, FeedCommand, FeedingEvent]),
+    forwardRef(() => TelegramModule),
   ],
   controllers: [FeederController],
   providers: [FeederService],

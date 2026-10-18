@@ -15,6 +15,7 @@ import { UpdateSettingsDto } from './dto/update-settings.dto.js';
 import { ClaimDeviceDto } from './dto/claim-device.dto.js';
 import { CreateInviteDto } from './dto/create-invite.dto.js';
 import { JoinDeviceDto } from './dto/join-device.dto.js';
+import { UpdateGroupSettingsDto } from './dto/update-group-settings.dto.js';
 import { TelegramAuthGuard } from '../../common/guards/telegram-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../../common/guards/telegram-auth.guard.js';
@@ -94,5 +95,14 @@ export class DevicesController {
     @Body() dto: UpdateSettingsDto,
   ) {
     return this.devicesService.updateDeviceSettings(id, dto);
+  }
+
+  @Patch(':id/group-settings')
+  @HttpCode(HttpStatus.OK)
+  async updateGroupSettings(
+    @Param('id') id: string,
+    @Body() dto: UpdateGroupSettingsDto,
+  ) {
+    return this.devicesService.updateGroupSettings(id, dto);
   }
 }

@@ -17,6 +17,7 @@ import { playToneSound, SOUND_TONE_PRESETS } from '@/lib/utils/audio.util';
 // Modular Cards
 import { DeviceFleetCard } from './cards/device-fleet-card';
 import { HouseholdAccessCard } from './cards/household-access-card';
+import { TelegramGroupControlCard } from './cards/telegram-group-control-card';
 import { TelegramNotificationsCard } from './cards/telegram-notifications-card';
 import { MelodyChimeCard } from './cards/melody-chime-card';
 
@@ -127,7 +128,15 @@ export function SettingsScreen(props: SettingsScreenProps = {}) {
         onPromptRemoveMember={(mem) => setMemberToRemove(mem)}
       />
 
-      {/* 3. Telegram Notifications Card */}
+      {/* 3. Telegram Family Group Control (Hybrid Architecture) */}
+      <TelegramGroupControlCard
+        device={activeDevice}
+        onUpdateGroupSettings={context.updateGroupSettings}
+        onRecordFeed={context.recordDispense}
+        onShowToast={showToast}
+      />
+
+      {/* 4. Telegram Notifications Card */}
       <TelegramNotificationsCard
         notifConfig={notifConfig}
         onUpdateNotifConfig={updateNotifConfig}

@@ -15,6 +15,7 @@ import { MqttModule } from './modules/mqtt/mqtt.module.js';
 import { DevicesModule } from './modules/devices/devices.module.js';
 import { FeederModule } from './modules/feeder/feeder.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { TelegramModule } from './modules/telegram/telegram.module.js';
 
 @Module({
   imports: [
@@ -81,6 +82,7 @@ import { HealthModule } from './modules/health/health.module.js';
     DevicesModule,
     FeederModule,
     HealthModule,
+    TelegramModule,
   ],
 })
 export class AppModule {}
