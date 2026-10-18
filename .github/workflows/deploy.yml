@@ -64,36 +64,43 @@ jobs:
     runs-on: ubuntu-latest
     environment: CHINCHEM
     steps:
-      - name: Checkout Compose & Config Files
+      - name: Checkout Compose File
         uses: actions/checkout@v4
 
-      - name: Copy Compose and Config to Server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          source: "docker-compose.traefik.yml,mosquitto/config/mosquitto.conf"
-          target: "/home/ubuntu"
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p ${{ secrets.SERVER_PORT || 22 }} -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Pull Images and Update Containers via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 22 }}
-          script_stop: true
-          script: |
+      - name: Copy docker-compose.traefik.yml to Server
+        run: |
+          scp -o StrictHostKeyChecking=no -P ${{ secrets.SERVER_PORT || 22 }} \
+            docker-compose.traefik.yml \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/home/ubuntu/docker-compose.traefik.yml
+
+      - name: Execute Deployment Commands via SSH
+        run: |
+          ssh -o StrictHostKeyChecking=no -p ${{ secrets.SERVER_PORT || 22 }} \
+            ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
             set -e
 
             cd /home/ubuntu
-            echo "📂 [Deploy] Working in directory: $(pwd)"
+            echo "📂 [Deploy] Current Directory: $(pwd)"
+
+            # Ensure mosquitto config exists without overwriting locked permissions
+            if [ ! -f mosquitto/config/mosquitto.conf ]; then
+              mkdir -p mosquitto/config
+              cat << 'MCONF' > mosquitto/config/mosquitto.conf
+listener 1883
+allow_anonymous true
+MCONF
+            fi
 
             # Check if .env is present
             if [ ! -f .env ]; then
-              echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are set."
+              echo "⚠️ [Deploy] Warning: .env file not found in $(pwd)! Ensure your environment variables are configured."
             fi
 
             # Pull newly pushed pre-built images from Docker Hub
@@ -109,3 +116,4 @@ jobs:
             docker image prune -f
 
             echo "✅ [Deploy] Deployment completed successfully!"
+          EOF
