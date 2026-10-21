@@ -4,11 +4,11 @@
  * ============================================================================
  * Hardware Bill of Materials:
  *  - ESP32 Development Board (ESP-WROOM-32)
- *  - SG90 Micro Servo (External Regulated 5V Supply, Common GND) -> GPIO 18
+ *  - SG90 Micro Servo (External Regulated 5V Supply, Common GND) -> GPIO 4
  *  - Tactile Push Button (Debounced, Switch to GND)            -> GPIO 27
  *  - Active Buzzer (Alerts & Sound Feedback)                    -> GPIO 25
  *  - 16x2 I2C LCD Display (SDA: GPIO 21, SCL: GPIO 22)         -> 0x27 or 0x3F
- *  - DS1302 Real-Time Clock Module (DAT: 19, CLK: 23, RST: 26) -> 3-wire
+ *  - DS1302 Real-Time Clock Module (DAT: 19, CLK: 18, RST: 5)  -> 3-wire
  *
  * MQTT Architecture:
  *  - Command topic:   feeders/{deviceId}/cmd/feed
@@ -36,14 +36,14 @@
 // ----------------------------------------------------------------------------
 // PIN DEFINITIONS
 // ----------------------------------------------------------------------------
-#define PIN_SERVO         18
-#define PIN_BUTTON        27
-#define PIN_BUZZER        25
-#define PIN_I2C_SDA       21
-#define PIN_I2C_SCL       22
-#define PIN_DS1302_DAT    19
-#define PIN_DS1302_CLK    23
-#define PIN_DS1302_RST    26
+#define PIN_SERVO         4   // SG90 Micro Servo PWM (GPIO 4; moved from GPIO 18 to avoid conflict with DS1302 CLK)
+#define PIN_BUTTON        27  // Tactile Push Button (to GND, internal pullup)
+#define PIN_BUZZER        25  // Active Buzzer
+#define PIN_I2C_SDA       21  // 16x2 I2C LCD SDA
+#define PIN_I2C_SCL       22  // 16x2 I2C LCD SCL
+#define PIN_DS1302_DAT    19  // DS1302 RTC Data (DAT / IO)
+#define PIN_DS1302_CLK    18  // DS1302 RTC Clock (CLK / SCLK)
+#define PIN_DS1302_RST    5   // DS1302 RTC Reset / Chip Enable (RST / CE)
 
 // ----------------------------------------------------------------------------
 // DEVICE & NETWORK CONFIGURATION (Defaults; overridable via build/config)
@@ -54,8 +54,8 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "Wokwi-GUEST";
-const char* WIFI_PASSWORD = "";
+const char* WIFI_SSID     = "moly";
+const char* WIFI_PASSWORD = "22224455";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
@@ -353,13 +353,13 @@ void rtcInit() {
   // 1. Try I2C DS1307 (Wokwi simulator or I2C module)
   ds1307Init();
 
-  // 2. Also initialize 3-wire DS1302 (Physical breadboard on GPIO 19, 23, 26)
+  // 2. Also initialize 3-wire DS1302 (Physical breadboard on GPIO 19, 18, 5)
   ds1302Init();
 
   if (isDs1307Present) {
     Serial.println(F("[RTC] Active RTC: DS1307 (I2C)"));
   } else {
-    Serial.println(F("[RTC] Active RTC: DS1302 (3-Wire GPIO 19, 23, 26)"));
+    Serial.println(F("[RTC] Active RTC: DS1302 (3-Wire GPIO 19, 18, 5)"));
   }
 }
 
@@ -675,11 +675,75 @@ void setup() {
   schedules[1] = { true, 18, 0, 700, "Dinner" };
   scheduleCount = 2;
 
-  // 7. Connect Wi-Fi (non-blocking attempt)
+  // 6. Connect Wi-Fi with animated status, timeout & detailed diagnostics
+  Serial.println(F("\n=================================================="));
+  Serial.printf("[WiFi] Connecting to SSID: '%s'...\n", WIFI_SSID);
+  Serial.println(F("=================================================="));
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting WiFi:");
+  lcd.setCursor(0, 1);
+  lcd.print(WIFI_SSID);
+
+  WiFi.disconnect(true); // Clear previous connection states
+  delay(100);
   WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-  // 8. Configure MQTT
+  unsigned long startAttemptTime = millis();
+  const unsigned long wifiTimeout = 15000; // 15 seconds connection timeout
+  int dotCount = 0;
+
+  while (WiFi.status() != WL_CONNECTED && (millis() - startAttemptTime < wifiTimeout)) {
+    delay(500);
+    Serial.print(F("."));
+    dotCount++;
+    lcd.setCursor(15, 1);
+    lcd.print((dotCount % 2 == 0) ? "." : " ");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println(F("✅ [WiFi] Connected successfully!"));
+    Serial.print(F("[WiFi] IP Address: "));
+    Serial.println(WiFi.localIP());
+    Serial.printf("[WiFi] Signal Strength (RSSI): %d dBm\n", WiFi.RSSI());
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Connected!");
+    lcd.setCursor(0, 1);
+    lcd.print(WiFi.localIP());
+    delay(1500);
+  } else {
+    Serial.println(F("❌ [WiFi] Connection Failed or Timed Out!"));
+    int status = WiFi.status();
+    Serial.printf("[WiFi] Error Status Code: %d -> ", status);
+    switch (status) {
+      case WL_NO_SSID_AVAIL:   Serial.println(F("SSID NOT FOUND! Make sure the router/hotspot is powered on & 2.4GHz is enabled.")); break;
+      case WL_CONNECT_FAILED:  Serial.println(F("AUTHENTICATION FAILED! Check Wi-Fi password.")); break;
+      case WL_CONNECTION_LOST: Serial.println(F("CONNECTION LOST during handshake.")); break;
+      case WL_DISCONNECTED:    Serial.println(F("DISCONNECTED! Check network signal.")); break;
+      default:                 Serial.println(F("IDLE / UNKNOWN STATUS.")); break;
+    }
+    Serial.println(F("💡 Troubleshooting Wi-Fi:"));
+    Serial.println(F("   1. ESP32 ONLY supports 2.4 GHz Wi-Fi (NOT 5 GHz)."));
+    Serial.println(F("   2. If using iPhone hotspot, turn ON 'Maximize Compatibility'."));
+    Serial.println(F("   3. If using Android hotspot, ensure AP Band is set to '2.4 GHz'."));
+    Serial.println(F("   4. OFFLINE MODE: Feeder schedules & push button continue working via RTC!"));
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WiFi Failed!");
+    lcd.setCursor(0, 1);
+    lcd.print("Running Offline");
+    delay(2000);
+  }
+
+  // 7. Configure MQTT
   mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
   mqttClient.setCallback(onMqttMessage);
 
@@ -695,6 +759,7 @@ void loop() {
   unsigned long now = millis();
 
   // 1. Maintain Wi-Fi, NTP Local Time Sync, and MQTT
+  static unsigned long lastWifiRetry = 0;
   if (WiFi.status() == WL_CONNECTED) {
     if (!ntpSynced) {
       syncNtpTime();
@@ -703,6 +768,13 @@ void loop() {
       reconnectMqtt();
     } else {
       mqttClient.loop();
+    }
+  } else {
+    // Attempt non-blocking Wi-Fi auto-reconnect every 25 seconds
+    if (now - lastWifiRetry >= 25000) {
+      lastWifiRetry = now;
+      Serial.println(F("[WiFi] Background auto-reconnecting to Wi-Fi..."));
+      WiFi.reconnect();
     }
   }
 

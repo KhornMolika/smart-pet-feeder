@@ -70,11 +70,11 @@ The **NestJS backend** is the only application component that publishes commands
 ### 4.1 Suggested ESP32 wiring (verify board pinout and module voltage)
 | Peripheral | ESP32 pin | Voltage / notes |
 |---|---|---|
-| Servo signal | GPIO 18 | External regulated servo power; common ground |
+| Servo signal | GPIO 4 | External regulated servo power; common ground (moved from 18 to free pin for RTC CLK) |
 | Button | GPIO 27 | Input pull-up; switch to GND; debounce in firmware |
 | Buzzer signal | GPIO 25 | Use transistor/driver if necessary |
 | LCD SDA / SCL | GPIO 21 / GPIO 22 | I²C; check voltage and level shifting |
-| DS1302 DAT / CLK / RST | GPIO 19 / GPIO 23 / GPIO 26 | ThreeWire interface; check RTC module voltage and logic levels |
+| DS1302 DAT / CLK / RST | GPIO 19 / GPIO 18 / GPIO 5 | ThreeWire interface; check RTC module voltage and logic levels (3.3V recommended) |
 
 ## 5. Tech stack and protocols
 | Layer | Choice |
