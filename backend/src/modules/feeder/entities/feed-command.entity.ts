@@ -17,9 +17,9 @@ export class FeedCommand extends BaseEntity {
   @Column({ type: 'varchar', length: 32, default: 'pending' })
   status: FeedCommandStatus;
 
-  @Column({ name: 'expires_at', type: 'datetime' })
+  @Column({ name: 'expires_at', type: 'timestamp' })
   expiresAt: Date;
 
-  @Column({ name: 'completed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt: Date | null;
 }

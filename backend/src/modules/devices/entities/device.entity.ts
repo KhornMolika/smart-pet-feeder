@@ -38,10 +38,10 @@ export class Device {
   @Column({ name: 'is_claimed', type: 'boolean', default: false })
   isClaimed: boolean;
 
-  @Column({ name: 'claimed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'claimed_at', type: 'timestamp', nullable: true })
   claimedAt: Date | null;
 
-  @Column({ name: 'last_seen_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'last_seen_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   lastSeenAt: Date;
 
   @Column({ name: 'firmware_version', type: 'varchar', length: 32, default: '1.0.0-esp32' })
@@ -68,10 +68,10 @@ export class Device {
   @Column({ name: 'group_guest_feed_allowed', type: 'boolean', default: true })
   groupGuestFeedAllowed: boolean;
 
-  @CreateDateColumn({ name: 'created_at', type: 'datetime' })
+  @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'datetime' })
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
   @OneToOne(() => DeviceSettings, (settings) => settings.device, { cascade: true })

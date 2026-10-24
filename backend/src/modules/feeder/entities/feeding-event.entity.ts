@@ -22,10 +22,10 @@ export class FeedingEvent extends BaseEntity {
   @Column({ type: 'varchar', length: 32, default: 'completed' })
   status: FeedingEventStatus;
 
-  @Column({ name: 'started_at', type: 'datetime', default: () => 'CURRENT_TIMESTAMP' })
+  @Column({ name: 'started_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   startedAt: Date;
 
-  @Column({ name: 'completed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt: Date | null;
 
   @Column({ name: 'duration_ms', type: 'int' })
