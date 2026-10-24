@@ -5,6 +5,7 @@ import { FeederDevice, FeedingEvent } from '@/types/feeder.types';
 import { playToneSound } from '@/lib/utils/audio.util';
 import { triggerHaptic, triggerNotificationHaptic, getStoredNotificationConfig } from '@/lib/utils/telegram.util';
 import { formatDuration } from '@/lib/utils/date.util';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 export function useDeviceFeed(
   activeDevice: FeederDevice,
@@ -88,12 +89,38 @@ export function useDeviceFeed(
   const triggerDispense = useCallback(async (durationOverride?: number) => {
     if (isDispensing || cooldownRemaining > 0) return;
 
-    const duration = durationOverride || selectedDurationMs;
+    // Guard against React Synthetic MouseEvents passed to onClick handlers
+    const duration =
+      typeof durationOverride === 'number' && !isNaN(durationOverride) && durationOverride > 0
+        ? durationOverride
+        : typeof selectedDurationMs === 'number' && !isNaN(selectedDurationMs) && selectedDurationMs > 0
+        ? selectedDurationMs
+        : 60000;
+
     triggerHaptic('medium');
     setIsDispensing(true);
     setFeedStatus('actuating');
     setActuationRemainingMs(duration);
     setNotificationToast(null);
+
+    // Publish MQTT feed command to ESP32 hardware via backend BFF
+    const hardwareDeviceId = activeDevice.claimToken
+      ? activeDevice.claimToken.replace(/^claim_/, '')
+      : activeDevice.id.replace(/^feeder-/, 'feeder_').replace(/-([a-zA-Z0-9]+)$/, '_$1');
+
+    fetch(`${getBackendApiUrl()}/api/v1/feeders/${hardwareDeviceId}/feed`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bff-source': 'NextJS-AppRouter',
+      },
+      body: JSON.stringify({
+        durationMs: duration,
+        source: 'manual_app',
+      }),
+    }).catch(() => {
+      // Fallback gracefully in client cache
+    });
 
     const notifConfig = getStoredNotificationConfig();
 
@@ -104,7 +131,6 @@ export function useDeviceFeed(
 
     const startTime = Date.now();
     const intervalStep = 50;
-
 
     // Countdown loop for food dispensing
     countdownIntervalRef.current = setInterval(() => {
@@ -117,7 +143,7 @@ export function useDeviceFeed(
         finishDispense(duration);
       }
     }, intervalStep);
-  }, [cooldownRemaining, finishDispense, isDispensing, selectedDurationMs]);
+  }, [activeDevice.claimToken, activeDevice.id, cooldownRemaining, finishDispense, isDispensing, selectedDurationMs]);
 
   const skipCooldown = useCallback(() => {
     if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current);

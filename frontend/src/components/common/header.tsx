@@ -98,8 +98,8 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
               setShowPicker(!showPicker);
             }}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border transition-all cursor-pointer text-left ${showPicker
-                ? 'border-[#143503] shadow-md ring-2 ring-[#143503]/15'
-                : 'border-[#143503]/15 shadow-xs hover:border-[#143503]/30 hover:shadow-sm'
+              ? 'border-[#143503] shadow-md ring-2 ring-[#143503]/15'
+              : 'border-[#143503]/15 shadow-xs hover:border-[#143503]/30 hover:shadow-sm'
               }`}
           >
             {/* Pet Icon Avatar */}
@@ -118,8 +118,8 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
             {/* Active Device Live Beacon */}
             <span
               className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeDevice.isOnline
-                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse'
-                  : 'bg-amber-400'
+                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse'
+                : 'bg-amber-400'
                 }`}
             />
 
@@ -140,7 +140,7 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
 
           {/* Device Picker Dropdown (Scales gracefully for 1 to 20 devices) */}
           {showPicker && (
-            <div className="absolute top-11 right-0 w-80 max-w-[calc(100vw-24px)] rounded-2xl bg-[#FFFDFB]/98 backdrop-blur-2xl border border-[#143503]/12 shadow-[0_16px_45px_-8px_rgba(20,53,3,0.22)] p-2.5 z-50 animate-scaleUp overflow-hidden">
+            <div className="absolute top-11 right-0 w-60 max-w-[calc(100vw-24px)] rounded-2xl bg-[#FFFDFB]/98 backdrop-blur-2xl border border-[#143503]/12 shadow-[0_16px_45px_-8px_rgba(20,53,3,0.22)] p-2.5 z-50 animate-scaleUp overflow-hidden">
               {/* Subtle ambient luxury backdrop */}
               <div className="absolute -top-8 -right-8 w-24 h-24 bg-[#BCDBF0]/25 rounded-full blur-xl pointer-events-none" />
               <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-[#A7D1AE]/20 rounded-full blur-xl pointer-events-none" />
@@ -173,16 +173,16 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
                       type="button"
                       onClick={() => handleDeviceClick(dev.id)}
                       className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer relative group ${isSelected
-                          ? 'bg-[#143503] text-[#FFF2E6] shadow-sm ring-1 ring-[#143503]'
-                          : 'bg-white/70 hover:bg-white text-[#143503] border border-[#143503]/8 hover:border-[#143503]/20 hover:shadow-2xs active:scale-[0.99]'
+                        ? 'bg-[#143503] text-[#FFF2E6] shadow-sm ring-1 ring-[#143503]'
+                        : 'bg-white/70 hover:bg-white text-[#143503] border border-[#143503]/8 hover:border-[#143503]/20 hover:shadow-2xs active:scale-[0.99]'
                         }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Pet Species Avatar */}
                         <div
                           className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${isSelected
-                              ? 'bg-white/15 text-[#FFF2E6] border-white/15 shadow-2xs'
-                              : 'bg-[#A7D1AE]/30 text-[#143503] border-[#143503]/10'
+                            ? 'bg-white/15 text-[#FFF2E6] border-white/15 shadow-2xs'
+                            : 'bg-[#A7D1AE]/30 text-[#143503] border-[#143503]/10'
                             }`}
                         >
                           <PetIcon
@@ -200,8 +200,8 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
                             </span>
                             <span
                               className={`w-1.5 h-1.5 rounded-full shrink-0 ${dev.isOnline
-                                  ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]'
-                                  : 'bg-amber-400'
+                                ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]'
+                                : 'bg-amber-400'
                                 }`}
                               title={dev.isOnline ? 'Online' : 'Offline'}
                             />

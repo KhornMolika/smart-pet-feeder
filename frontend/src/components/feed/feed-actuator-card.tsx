@@ -218,7 +218,7 @@ export function FeedActuatorCard({
           <button
             id="dispense-food-btn"
             type="button"
-            onClick={onTriggerDispense}
+            onClick={() => onTriggerDispense()}
             disabled={isDispensing}
             className={`relative w-32 h-32 rounded-full flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-200 active:scale-95 text-[#FFF2E6] ${
               isDispensing

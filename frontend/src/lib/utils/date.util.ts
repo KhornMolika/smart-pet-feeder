@@ -46,6 +46,7 @@ export function getCountdownUntil(isoString: string): string {
  * Formats milliseconds into human-readable duration (e.g. 30s, 1m, 1m 30s, 3m)
  */
 export function formatDuration(ms: number): string {
+  if (typeof ms !== 'number' || isNaN(ms) || ms <= 0) return '0s';
   const totalSeconds = Math.round(ms / 1000);
   if (totalSeconds < 60) return `${totalSeconds}s`;
   const mins = Math.floor(totalSeconds / 60);

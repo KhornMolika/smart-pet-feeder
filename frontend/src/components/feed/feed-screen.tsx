@@ -43,9 +43,9 @@ function FeedDashboard({
   const presets = activeDevice.customPresets || DEFAULT_PORTION_PRESETS;
   const [activePresetId, setActivePresetId] = useState<string | null>('bowl');
 
-  const [countdownText, setCountdownText] = useState<string>('in 2h 15m');
-  const [lastFeedText, setLastFeedText] = useState<string>('45m ago');
-  const [nextMealTimeDisplay, setNextMealTimeDisplay] = useState<string>('6:30 PM');
+  const [countdownText, setCountdownText] = useState<string>('');
+  const [lastFeedText, setLastFeedText] = useState<string>('');
+  const [nextMealTimeDisplay, setNextMealTimeDisplay] = useState<string>('');
   const [scheduledMealsCount, setScheduledMealsCount] = useState<number>(0);
   const [manualMealsCount, setManualMealsCount] = useState<number>(0);
   const [todayMealsServedCount, setTodayMealsServedCount] = useState<number>(activeDevice.todayMealsServed ?? 0);
@@ -81,11 +81,17 @@ function FeedDashboard({
           );
         }
       } catch {
-        setNextMealTimeDisplay('6:30 PM');
+        setNextMealTimeDisplay('');
       }
+    } else {
+      setCountdownText('');
+      setNextMealTimeDisplay('');
     }
+
     if (activeDevice.lastFeedAt) {
       setLastFeedText(formatRelativeTime(activeDevice.lastFeedAt));
+    } else {
+      setLastFeedText('');
     }
 
     const todayStr = new Date().toDateString();
