@@ -154,7 +154,6 @@ export function useDeviceFeed(
       },
       body: JSON.stringify({
         durationMs: duration,
-        source: 'manual_app',
       }),
     })
       .then(async (res) => {
