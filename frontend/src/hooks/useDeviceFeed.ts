@@ -148,10 +148,7 @@ export function useDeviceFeed(
 
     fetch(`${getBackendApiUrl()}/api/v1/devices/${hardwareDeviceId}/feed`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bff-source': 'NextJS-AppRouter',
-      },
+      headers: getTelegramAuthHeaders(),
       body: JSON.stringify({
         durationMs: duration,
       }),
@@ -160,12 +157,22 @@ export function useDeviceFeed(
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           console.error('[Feed Now] Backend feed dispatch failed:', res.status, body);
+          if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+          setIsDispensing(false);
+          setFeedStatus('error');
+          setNotificationToast(body.error || 'Failed to dispatch feed. Feeder may be in cooldown.');
+          setTimeout(() => setNotificationToast(null), 4000);
         } else {
           console.log(`[Feed Now] ✅ Successfully dispatched feed command to ESP32 (${duration}ms)`);
         }
       })
       .catch((err) => {
         console.error('[Feed Now] Network error triggering feed:', err);
+        if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+        setIsDispensing(false);
+        setFeedStatus('error');
+        setNotificationToast('Network error triggering feed');
+        setTimeout(() => setNotificationToast(null), 4000);
       });
 
     const notifConfig = getStoredNotificationConfig();
