@@ -65,6 +65,96 @@ export function useFeederFleet() {
     } catch {}
   }, []);
 
+  // Synchronize user device fleet from backend via Telegram User authentication
+  useEffect(() => {
+    let isSubscribed = true;
+    async function syncBackendDevices() {
+      try {
+        const backendUrl = getBackendApiUrl();
+        const headers = getTelegramAuthHeaders();
+        const res = await fetch(`${backendUrl}/api/v1/devices`, { headers });
+        if (res.ok) {
+          const backendList = await res.json();
+          if (Array.isArray(backendList) && backendList.length > 0 && isSubscribed) {
+            setDevices((currentLocalDevices) => {
+              // Convert backend records into FeederDevice
+              const mappedBackend: FeederDevice[] = backendList.map((d: any) => ({
+                id: d.id,
+                name: d.name || `${d.petName || 'Mochi'}'s Feeder`,
+                petName: d.petName || 'Mochi',
+                petEmoji: d.petEmoji || 'cat',
+                petIcon: d.petEmoji || 'cat',
+                room: d.room || 'Living Room',
+                isOnline: d.isOnline ?? true,
+                rtcValid: true,
+                wifiRssi: -60,
+                lastSeenAt: d.lastSeenAt || new Date().toISOString(),
+                claimToken: d.claimToken,
+                telegramGroupId: d.telegramGroupId,
+                telegramGroupName: d.telegramGroupName,
+                groupFeedEnabled: d.groupFeedEnabled,
+                groupGuestFeedAllowed: d.groupGuestFeedAllowed,
+                todayMealsServed: 0,
+                customPresets: DEFAULT_PORTION_PRESETS,
+              }));
+
+              // Merge: backend is authoritative for device list and pet properties
+              const mergedMap = new Map<string, FeederDevice>();
+
+              for (const bd of mappedBackend) {
+                const existing = currentLocalDevices.find((ld) => isSameDeviceId(ld.id, bd.id));
+                if (existing) {
+                  mergedMap.set(bd.id, {
+                    ...existing,
+                    ...bd,
+                    customPresets: existing.customPresets || bd.customPresets,
+                    isAwayMode: existing.isAwayMode,
+                  });
+                } else {
+                  mergedMap.set(bd.id, bd);
+                }
+              }
+
+              // Preserve any active local claimed devices if not returned yet
+              for (const ld of currentLocalDevices) {
+                if (!Array.from(mergedMap.keys()).some((k) => isSameDeviceId(k, ld.id))) {
+                  if (ld.claimToken) {
+                    mergedMap.set(ld.id, ld);
+                  }
+                }
+              }
+
+              const mergedList = Array.from(mergedMap.values());
+              try {
+                localStorage.setItem(STORAGE_KEY_DEVICES, JSON.stringify(mergedList));
+              } catch {}
+
+              setActiveDeviceId((prevActive) => {
+                if (!prevActive || !mergedList.some((d) => isSameDeviceId(d.id, prevActive))) {
+                  const newActive = mergedList[0]?.id || '';
+                  try {
+                    localStorage.setItem(STORAGE_KEY_ACTIVE_ID, newActive);
+                  } catch {}
+                  return newActive;
+                }
+                return prevActive;
+              });
+
+              return mergedList;
+            });
+          }
+        }
+      } catch {
+        // Fallback gracefully to offline cache
+      }
+    }
+
+    syncBackendDevices();
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
   // Save changes to localStorage
   const saveDevices = useCallback((newDevices: FeederDevice[]) => {
     setDevices(newDevices);

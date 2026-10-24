@@ -5,7 +5,7 @@ import { FeedingEvent, FeederDevice } from '@/types/feeder.types';
 import { PetIcon } from '@/components/common/pet-icon';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 import { formatDuration, formatTimeOnly, formatRelativeTime } from '@/lib/utils/date.util';
-import { Utensils, RotateCcw, Clock, Smartphone, Hand, ChevronRight } from 'lucide-react';
+import { Utensils, RotateCcw, Clock, Smartphone, Hand, ChevronRight, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 export interface DateGroup {
   dateKey: string;
@@ -20,6 +20,10 @@ interface HistoryTimelineProps {
   hasActiveFilters: boolean;
   onClearFilters: () => void;
   onSelectEvent: (event: FeedingEvent) => void;
+  visibleLimit?: number;
+  onLoadMore?: () => void;
+  onShowAll?: () => void;
+  totalEventsCount?: number;
 }
 
 export function HistoryTimeline({
@@ -28,6 +32,10 @@ export function HistoryTimeline({
   hasActiveFilters,
   onClearFilters,
   onSelectEvent,
+  visibleLimit = 10,
+  onLoadMore,
+  onShowAll,
+  totalEventsCount = 0,
 }: HistoryTimelineProps) {
   const getDeviceForEvent = (deviceId: string) => {
     return devices.find((d) => d.id === deviceId);
@@ -62,9 +70,38 @@ export function HistoryTimeline({
     );
   }
 
+  // Budget-based event slicing to prevent overwhelming the UI
+  let remainingBudget = visibleLimit;
+  const slicedGroups: {
+    dateKey: string;
+    dateLabel: string;
+    events: FeedingEvent[];
+    totalDurationMs: number;
+  }[] = [];
+
+  let renderedCount = 0;
+
+  for (const group of dateGroups) {
+    if (remainingBudget <= 0) break;
+
+    const sliceSize = Math.min(group.events.length, remainingBudget);
+    const visibleEvents = group.events.slice(0, sliceSize);
+    remainingBudget -= sliceSize;
+    renderedCount += visibleEvents.length;
+
+    slicedGroups.push({
+      dateKey: group.dateKey,
+      dateLabel: group.dateLabel,
+      events: visibleEvents,
+      totalDurationMs: visibleEvents.reduce((acc, curr) => acc + curr.durationMs, 0),
+    });
+  }
+
+  const hasMore = totalEventsCount > renderedCount;
+
   return (
     <div className="flex flex-col gap-4">
-      {dateGroups.map((group) => (
+      {slicedGroups.map((group) => (
         <div key={group.dateKey} className="flex flex-col gap-2">
           {/* Date Header Ribbon */}
           <div className="flex items-center justify-between px-2 pt-1 pb-0.5">
@@ -77,7 +114,7 @@ export function HistoryTimeline({
             <div className="flex items-center gap-1.5 text-[11px] font-semibold text-[#4B633E] bg-[#FFF2E6]/60 px-2.5 py-0.5 rounded-full border border-[#143503]/8">
               <span>{group.events.length} {group.events.length === 1 ? 'feed' : 'feeds'}</span>
               <span>•</span>
-              <span>{formatDuration(group.totalDurationMs)} runtime</span>
+              <span>{formatDuration(group.totalDurationMs)}</span>
             </div>
           </div>
 
@@ -93,12 +130,12 @@ export function HistoryTimeline({
                     triggerHaptic('light');
                     onSelectEvent(item);
                   }}
-                  className="artisan-card p-3.5 sm:p-4 flex items-center justify-between gap-3 shadow-xs hover:border-[#143503]/25 transition-all cursor-pointer group active:scale-[0.99] bg-white/80"
+                  className="artisan-card p-3 sm:p-3.5 flex items-center justify-between gap-3 shadow-xs hover:border-[#143503]/25 hover:shadow-sm transition-all cursor-pointer group active:scale-[0.99] bg-white/85"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     {/* Pet Icon Avatar */}
-                    <div className="w-10 h-10 rounded-2xl bg-[#A7D1AE]/30 text-[#143503] flex items-center justify-center shrink-0 border border-[#143503]/10 group-hover:scale-105 transition-transform">
-                      <PetIcon icon={device?.petIcon || device?.petEmoji || 'cat'} size={18} />
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#A7D1AE]/30 text-[#143503] flex items-center justify-center shrink-0 border border-[#143503]/10 group-hover:scale-105 transition-transform">
+                      <PetIcon icon={device?.petIcon || device?.petEmoji || 'cat'} size={17} />
                     </div>
 
                     {/* Event Details */}
@@ -112,17 +149,17 @@ export function HistoryTimeline({
                         {item.source === 'scheduled' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#2D6A4F]/10 text-[#2D6A4F] border border-[#2D6A4F]/20">
                             <Clock size={9} />
-                            <span>Scheduled</span>
+                            <span>Schedule</span>
                           </span>
                         ) : item.source === 'manual_app' ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#0284C7]/10 text-[#0284C7] border border-[#0284C7]/20">
                             <Smartphone size={9} />
-                            <span>App Dispense</span>
+                            <span>App</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#D97706]/10 text-[#D97706] border border-[#D97706]/20">
                             <Hand size={9} />
-                            <span>Feeder Button</span>
+                            <span>Button</span>
                           </span>
                         )}
                       </div>
@@ -134,23 +171,17 @@ export function HistoryTimeline({
                         <span>•</span>
                         <span>{formatRelativeTime(item.startedAt)}</span>
                       </div>
-
-                      {item.note && (
-                        <div className="text-[11px] text-[#4B633E]/80 italic truncate mt-0.5">
-                          {item.note}
-                        </div>
-                      )}
                     </div>
                   </div>
 
                   {/* Right Duration & Status */}
                   <div className="text-right shrink-0 flex items-center gap-2">
                     <div>
-                      <div className="text-sm sm:text-base font-extrabold font-mono text-[#143503]">
+                      <div className="text-xs sm:text-sm font-extrabold font-mono text-[#143503]">
                         {formatDuration(item.durationMs)}
                       </div>
-                      <div className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded-md border border-emerald-200/60 inline-flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                      <div className="text-[9px] sm:text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200/60 inline-flex items-center gap-1">
+                        <CheckCircle2 size={10} className="text-emerald-600" />
                         <span>Completed</span>
                       </div>
                     </div>
@@ -162,6 +193,45 @@ export function HistoryTimeline({
           </div>
         </div>
       ))}
+
+      {/* Pagination & Limiter Footer */}
+      {hasMore && (
+        <div className="p-4 rounded-2xl bg-white/70 border border-[#143503]/10 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="text-xs text-[#4B633E] font-medium">
+            Showing <span className="font-bold font-mono text-[#143503]">{renderedCount}</span> of{' '}
+            <span className="font-bold font-mono text-[#143503]">{totalEventsCount}</span> feeds
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {onLoadMore && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onLoadMore();
+                }}
+                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl bg-[#143503] text-[#FFF2E6] text-xs font-bold shadow-xs hover:bg-[#143503]/90 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <ChevronDown size={14} />
+                <span>Load More (+10)</span>
+              </button>
+            )}
+
+            {onShowAll && (
+              <button
+                type="button"
+                onClick={() => {
+                  triggerHaptic('light');
+                  onShowAll();
+                }}
+                className="px-3 py-2 rounded-xl bg-white hover:bg-[#FFF2E6] border border-[#143503]/15 text-[#143503] text-xs font-semibold shadow-2xs transition-all cursor-pointer active:scale-95"
+              >
+                <span>Show All ({totalEventsCount})</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

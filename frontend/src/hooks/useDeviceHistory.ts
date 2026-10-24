@@ -280,6 +280,10 @@ export function useDeviceHistory() {
     document.body.removeChild(link);
   }, [filteredHistory, timeframe, customStartDate, customEndDate]);
 
+  const clearHistory = useCallback(() => {
+    saveHistory([]);
+  }, [saveHistory]);
+
   return {
     history: filteredHistory,
     allHistory: history,
@@ -301,6 +305,7 @@ export function useDeviceHistory() {
     clientNow,
     timeframeCounts,
     clearFilters,
+    clearHistory,
     addHistoryEvent,
     exportCsv,
   };

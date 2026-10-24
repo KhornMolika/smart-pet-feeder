@@ -65,11 +65,13 @@ export function HistoryScreen(props: HistoryScreenProps = {}) {
     clientNow,
     timeframeCounts,
     clearFilters,
+    clearHistory,
     exportCsv,
   } = context;
 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedEventForDetail, setSelectedEventForDetail] = useState<FeedingEvent | null>(null);
+  const [visibleLimit, setVisibleLimit] = useState<number>(10);
 
   // Summary Metrics calculations
   const totalDurationMs = useMemo(() => {
@@ -150,7 +152,9 @@ export function HistoryScreen(props: HistoryScreenProps = {}) {
         onResetFilters={() => {
           clearFilters();
           setShowDatePicker(false);
+          setVisibleLimit(10);
         }}
+        onClearHistory={clearHistory}
         onExportCsv={exportCsv}
       />
 
@@ -193,8 +197,13 @@ export function HistoryScreen(props: HistoryScreenProps = {}) {
         onClearFilters={() => {
           clearFilters();
           setShowDatePicker(false);
+          setVisibleLimit(10);
         }}
         onSelectEvent={(event) => setSelectedEventForDetail(event)}
+        visibleLimit={visibleLimit}
+        onLoadMore={() => setVisibleLimit((prev) => prev + 10)}
+        onShowAll={() => setVisibleLimit(history.length)}
+        totalEventsCount={history.length}
       />
 
       {/* 5. Event Detail Audit Modal */}

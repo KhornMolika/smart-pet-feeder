@@ -208,101 +208,6 @@ export function useDeviceSchedules(deviceId: string) {
   };
 
   /**
-   * Automatically adds or removes schedules to exactly match the target meals count.
-   * Preserves customized meals when possible, keeping breakfast and dinner as anchors.
-   */
-  const syncSchedulesToTarget = useCallback(
-    (targetCount: number): FeedingSchedule[] => {
-      const clamped = Math.max(1, Math.min(10, targetCount));
-      const currentDeviceSchedules = allSchedules.filter((s) => isSameDeviceId(s.deviceId, deviceId));
-      const otherDeviceSchedules = allSchedules.filter((s) => !isSameDeviceId(s.deviceId, deviceId));
-
-      let updatedDeviceSchedules: FeedingSchedule[] = [];
-
-      if (currentDeviceSchedules.length === clamped) {
-        // Count already matches; ensure all are enabled
-        updatedDeviceSchedules = currentDeviceSchedules.map((s) => ({ ...s, enabled: true }));
-      } else if (currentDeviceSchedules.length > clamped) {
-        const getPriorityScore = (s: FeedingSchedule) => {
-          const [h] = s.timeLocal.split(':').map((v) => parseInt(v, 10));
-          if (h >= 6 && h <= 9) return 1; // Breakfast
-          if (h >= 17 && h <= 20) return 2; // Dinner
-          if (h >= 11 && h <= 13) return 3; // Lunch / Noon snack
-          if (h >= 21 && h <= 23) return 4; // Supper
-          if (h >= 14 && h <= 16) return 5; // Afternoon treat
-          if (h > 9 && h < 11) return 6; // Mid-morning
-          return 7;
-        };
-
-        const ranked = [...currentDeviceSchedules].sort(
-          (a, b) => getPriorityScore(a) - getPriorityScore(b)
-        );
-        const retained = ranked.slice(0, clamped).map((s) => ({ ...s, enabled: true }));
-        updatedDeviceSchedules = retained.sort((a, b) => a.timeLocal.localeCompare(b.timeLocal));
-      } else {
-        const existing = currentDeviceSchedules.map((s) => ({ ...s, enabled: true }));
-        const needed = clamped - existing.length;
-
-        const existingTimes = new Set(existing.map((s) => s.timeLocal));
-        const added: FeedingSchedule[] = [];
-
-        for (const preset of DEFAULT_MEAL_PRESETS) {
-          if (added.length >= needed) break;
-          const [ph, pm] = preset.timeLocal.split(':').map((v) => parseInt(v, 10));
-          const presetMinutes = ph * 60 + pm;
-
-          const hasCloseTime = existing.some((s) => {
-            const [sh, sm] = s.timeLocal.split(':').map((v) => parseInt(v, 10));
-            const smMinutes = sh * 60 + sm;
-            return Math.abs(presetMinutes - smMinutes) < 45;
-          });
-
-          if (!existingTimes.has(preset.timeLocal) && !hasCloseTime) {
-            added.push({
-              id: `sched-${Date.now()}-${added.length}`,
-              deviceId,
-              timeLocal: preset.timeLocal,
-              daysOfWeek: preset.daysOfWeek,
-              durationMs: preset.durationMs,
-              enabled: true,
-              label: preset.label,
-            });
-            existingTimes.add(preset.timeLocal);
-          }
-        }
-
-        let fallbackHour = 9;
-        while (added.length < needed) {
-          const hourStr = String(fallbackHour).padStart(2, '0');
-          const timeStr = `${hourStr}:00`;
-          if (!existingTimes.has(timeStr)) {
-            added.push({
-              id: `sched-${Date.now()}-${added.length}`,
-              deviceId,
-              timeLocal: timeStr,
-              daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
-              durationMs: 30000,
-              enabled: true,
-              label: `Meal ${existing.length + added.length + 1}`,
-            });
-            existingTimes.add(timeStr);
-          }
-          fallbackHour = (fallbackHour + 2) % 24;
-        }
-
-        updatedDeviceSchedules = [...existing, ...added].sort((a, b) =>
-          a.timeLocal.localeCompare(b.timeLocal)
-        );
-      }
-
-      const newAllSchedules = [...otherDeviceSchedules, ...updatedDeviceSchedules];
-      saveSchedules(newAllSchedules);
-      return updatedDeviceSchedules;
-    },
-    [allSchedules, deviceId, saveSchedules]
-  );
-
-  /**
    * Applies popular routine presets (e.g. 2 everyday, 3 everyday, or 2 on weekdays and 3 on weekends)
    */
   const applyPresetRoutine = useCallback(
@@ -350,7 +255,6 @@ export function useDeviceSchedules(deviceId: string) {
     updateSchedule,
     toggleSchedule,
     deleteSchedule,
-    syncSchedulesToTarget,
     applyPresetRoutine,
   };
 }

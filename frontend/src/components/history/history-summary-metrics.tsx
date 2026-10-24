@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Utensils, RotateCcw, Download, Clock, CheckCircle2 } from 'lucide-react';
+import { Utensils, RotateCcw, Download, Clock, CheckCircle2, Trash2 } from 'lucide-react';
 import { formatDuration } from '@/lib/utils/date.util';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 
@@ -13,6 +13,7 @@ interface HistorySummaryMetricsProps {
   hasActiveFilters: boolean;
   onResetFilters: () => void;
   onExportCsv: () => void;
+  onClearHistory?: () => void;
 }
 
 export function HistorySummaryMetrics({
@@ -23,6 +24,7 @@ export function HistorySummaryMetrics({
   hasActiveFilters,
   onResetFilters,
   onExportCsv,
+  onClearHistory,
 }: HistorySummaryMetricsProps) {
   return (
     <div className="artisan-card p-4 sm:p-5 flex flex-col gap-3.5 relative overflow-hidden">
@@ -57,6 +59,23 @@ export function HistorySummaryMetrics({
             >
               <RotateCcw size={12} />
               <span className="hidden sm:inline">Reset</span>
+            </button>
+          )}
+
+          {onClearHistory && totalFeeds > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Clear all local feeding logs?')) {
+                  triggerHaptic('medium');
+                  onClearHistory();
+                }
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-white hover:bg-red-50 border border-red-200 text-red-600 text-xs font-semibold transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Clear all stored logs"
+            >
+              <Trash2 size={12} />
+              <span className="hidden sm:inline">Clear</span>
             </button>
           )}
 

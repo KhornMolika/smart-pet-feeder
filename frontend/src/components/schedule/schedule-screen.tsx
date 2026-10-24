@@ -8,7 +8,6 @@ import { getNextScheduledIso, getWeeklyMealCounts } from '@/lib/utils/date.util'
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 
 // Modular Cards
-import { DailyGoalCard } from '@/components/settings/cards/daily-goal-card';
 import { PetAwayModeCard } from '@/components/settings/cards/pet-away-mode-card';
 import { FeedingSchedulesCard } from '@/components/settings/cards/feeding-schedules-card';
 import { PortionTimersCard } from '@/components/settings/cards/portion-timers-card';
@@ -17,7 +16,7 @@ import { PortionTimersCard } from '@/components/settings/cards/portion-timers-ca
 import { ScheduleFormModal } from '@/components/settings/modals/schedule-form-modal';
 import { DeleteScheduleModal } from '@/components/settings/modals/delete-schedule-modal';
 
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, CheckCircle2 } from 'lucide-react';
 
 interface ScheduleScreenProps {
   activeDevice?: FeederDevice;
@@ -61,14 +60,12 @@ function ScheduleDashboard({
 }: ScheduleScreenProps & { activeDevice: FeederDevice }) {
   const context = useFeederContext();
   const onUpdateDevicePresets = propUpdatePresets || context.updateDevicePresets;
-  const onUpdateDeviceTarget = context.updateDeviceTarget;
 
-  const { schedules, addSchedule, updateSchedule, toggleSchedule, deleteSchedule, syncSchedulesToTarget } =
+  const { schedules, addSchedule, updateSchedule, toggleSchedule, deleteSchedule } =
     useDeviceSchedules(activeDevice.id);
 
-  // Daily Meals Target & Toast state
-  const [dailyMealsTarget, setDailyMealsTarget] = useState<number>(activeDevice.todayMealsTarget ?? 3);
-  const [targetSavedToast, setTargetSavedToast] = useState(false);
+  // Status Feedback Toast state
+  const [feedbackToast, setFeedbackToast] = useState(false);
   const [toastMessage, setToastMessage] = useState<string>('');
 
   // Modals state
@@ -84,27 +81,13 @@ function ScheduleDashboard({
   const [presetsSavedToast, setPresetsSavedToast] = useState(false);
 
   useEffect(() => {
-    setDailyMealsTarget(activeDevice.todayMealsTarget ?? 3);
     const s = activeDevice.customPresets?.find((p) => p.id === 'snack')?.durationMs ?? 15000;
     const b = activeDevice.customPresets?.find((p) => p.id === 'bowl')?.durationMs ?? 30000;
     const f = activeDevice.customPresets?.find((p) => p.id === 'feast')?.durationMs ?? 45000;
     setSnackMs(s);
     setBowlMs(b);
     setFeastMs(f);
-  }, [activeDevice.id, activeDevice.todayMealsTarget, activeDevice.customPresets]);
-
-  const todayTarget = dailyMealsTarget;
-
-  const handleUpdateTarget = (newTarget: number) => {
-    triggerHaptic('medium');
-    const clamped = Math.max(1, Math.min(10, newTarget));
-    setDailyMealsTarget(clamped);
-    onUpdateDeviceTarget(activeDevice.id, clamped);
-
-    setToastMessage(`Daily goal set to ${clamped} meals/day for ${activeDevice.petName}!`);
-    setTargetSavedToast(true);
-    setTimeout(() => setTargetSavedToast(false), 3000);
-  };
+  }, [activeDevice.id, activeDevice.customPresets]);
 
   const handleToggleAwayMode = () => {
     triggerHaptic('medium');
@@ -213,22 +196,21 @@ function ScheduleDashboard({
       context.updateDeviceNextScheduledFeedAt(activeDevice.id, nextIso);
     }
 
-    setTargetSavedToast(true);
-    setTimeout(() => setTargetSavedToast(false), 3000);
+    setFeedbackToast(true);
+    setTimeout(() => setFeedbackToast(false), 3000);
   };
 
   return (
     <div className="w-full flex flex-col gap-4 animate-fadeIn pb-6">
-      {/* 1. Daily Feeding Goal Card */}
-      <DailyGoalCard
-        petName={activeDevice.petName}
-        todayTarget={todayTarget}
-        onUpdateTarget={handleUpdateTarget}
-        targetSavedToast={targetSavedToast}
-        toastMessage={toastMessage}
-      />
+      {/* Toast Notification Banner */}
+      {feedbackToast && (
+        <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[#143503] text-[#FFF2E6] text-xs font-semibold shadow-md animate-fadeIn transition-all border border-[#A7D1AE]/20">
+          <CheckCircle2 size={16} className="text-[#A7D1AE] shrink-0" />
+          <span className="truncate">{toastMessage}</span>
+        </div>
+      )}
 
-      {/* 2. Pet Away Mode Toggle Card */}
+      {/* 1. Pet Away Mode Toggle Card */}
       <PetAwayModeCard
         isAwayMode={activeDevice.isAwayMode}
         petName={activeDevice.petName}

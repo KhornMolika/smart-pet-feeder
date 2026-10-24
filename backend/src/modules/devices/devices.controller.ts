@@ -48,6 +48,11 @@ export class DevicesController {
     return this.devicesService.joinDevice(dto, user);
   }
 
+  @Get()
+  async getUserDevices(@CurrentUser() user: AuthenticatedUser) {
+    return this.devicesService.getUserDevices(user);
+  }
+
   @Get(':id')
   async getDevice(@Param('id') id: string) {
     return this.devicesService.getDevice(id);

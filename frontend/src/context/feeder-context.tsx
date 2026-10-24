@@ -57,6 +57,7 @@ interface FeederContextType {
   clientNow: Date | null;
   timeframeCounts: { all: number; today: number; this_week: number; this_month: number };
   clearFilters: () => void;
+  clearHistory: () => void;
   addHistoryEvent: (event: FeedingEvent) => void;
   exportCsv: () => void;
 

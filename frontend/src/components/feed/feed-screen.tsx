@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { FeederDevice, FeedingEvent, PortionPreset } from '@/types/feeder.types';
 import { useDeviceFeed } from '@/hooks/useDeviceFeed';
 import { DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
-import { formatRelativeTime, getCountdownUntil, getNextScheduledIso, getTodayMealsTarget } from '@/lib/utils/date.util';
+import { formatRelativeTime, getCountdownUntil, getNextScheduledIso } from '@/lib/utils/date.util';
 import { isSameDeviceId } from '@/lib/utils/device.util';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 import { useFeederContext } from '@/context/feeder-context';
@@ -50,11 +50,11 @@ function FeedDashboard({
   const [scheduledMealsCount, setScheduledMealsCount] = useState<number>(0);
   const [manualMealsCount, setManualMealsCount] = useState<number>(0);
   const [todayMealsServedCount, setTodayMealsServedCount] = useState<number>(activeDevice.todayMealsServed ?? 0);
-  const [todayTargetCount, setTodayTargetCount] = useState<number>(activeDevice.todayMealsTarget ?? 3);
+  const [activeSchedulesCount, setActiveSchedulesCount] = useState<number>(0);
 
   useEffect(() => {
     let nextFeedTargetIso = activeDevice.nextScheduledFeedAt;
-    let targetForToday = activeDevice.todayMealsTarget ?? 3;
+    let enabledCount = 0;
     try {
       const stored = localStorage.getItem('chinchum_schedules');
       if (stored) {
@@ -65,12 +65,12 @@ function FeedDashboard({
           if (computedNext) {
             nextFeedTargetIso = computedNext;
           }
-          targetForToday = activeDevice.todayMealsTarget ?? getTodayMealsTarget(deviceScheds, targetForToday);
+          enabledCount = deviceScheds.filter((s) => s.enabled).length;
         }
       }
     } catch {}
 
-    setTodayTargetCount(targetForToday);
+    setActiveSchedulesCount(enabledCount);
 
     if (nextFeedTargetIso) {
       setCountdownText(getCountdownUntil(nextFeedTargetIso));
@@ -112,7 +112,6 @@ function FeedDashboard({
   }, [
     activeDevice.id,
     activeDevice.todayMealsServed,
-    activeDevice.todayMealsTarget,
     activeDevice.lastFeedAt,
     activeDevice.nextScheduledFeedAt,
     context.allHistory,
@@ -147,23 +146,6 @@ function FeedDashboard({
     setSelectedDurationMs(preset.durationMs);
   };
 
-  // Dynamic Today's Meals Metrics
-  const todayMealsServed = todayMealsServedCount;
-  const todayMealsTarget = todayTargetCount;
-  const mealsRemaining = Math.max(0, todayMealsTarget - todayMealsServed);
-  const isGoalExceeded = todayMealsServed > todayMealsTarget;
-  const isGoalMet = todayMealsServed === todayMealsTarget;
-  const extraMeals = Math.max(0, todayMealsServed - todayMealsTarget);
-  const totalMealSegments = Math.max(todayMealsTarget, todayMealsServed);
-
-  const mealStatus = isGoalExceeded
-    ? { label: `+${extraMeals} Treat${extraMeals > 1 ? 's' : ''}`, badgeCls: 'bg-amber-100 text-amber-900 border-amber-300 font-bold' }
-    : isGoalMet
-    ? { label: 'Completed', badgeCls: 'bg-[#A7D1AE]/45 text-[#143503] border-[#143503]/20 font-bold' }
-    : todayMealsServed > 0
-    ? { label: 'On Track', badgeCls: 'bg-[#BCDBF0]/55 text-[#143503] border-[#143503]/15 font-bold' }
-    : { label: 'Pending', badgeCls: 'bg-[#FFF2E6] text-[#4B633E] border-[#143503]/15 font-bold' };
-
   return (
     <div className="w-full flex flex-col gap-4 animate-fadeIn">
       {/* 1. Pet Away Mode Active Banner */}
@@ -192,18 +174,13 @@ function FeedDashboard({
         onSkipCooldown={skipCooldown}
       />
 
-      {/* 3. Daily Feeding Goals Card */}
+      {/* 3. Today's Feeding Summary Card */}
       <FoodStorageAndGoalsCard
         activeDevice={activeDevice}
-        todayMealsServed={todayMealsServed}
-        todayMealsTarget={todayMealsTarget}
-        mealsRemaining={mealsRemaining}
-        isGoalExceeded={isGoalExceeded}
-        extraMeals={extraMeals}
-        totalMealSegments={totalMealSegments}
-        mealStatus={mealStatus}
+        todayMealsServed={todayMealsServedCount}
         scheduledMealsCount={scheduledMealsCount}
         manualMealsCount={manualMealsCount}
+        activeSchedulesCount={activeSchedulesCount}
       />
 
       {/* 4. Last Feed & Next Feed Cards */}

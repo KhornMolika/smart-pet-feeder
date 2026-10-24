@@ -347,6 +347,43 @@ export class DevicesService implements OnModuleInit {
     return true;
   }
 
+  async getUserDevices(user: AuthenticatedUser): Promise<Device[]> {
+    // 1. Find all device IDs where the user is a registered member
+    const memberRecords = await this.memberRepository.find({
+      where: user.telegramId
+        ? [{ userId: user.id }, { telegramId: user.telegramId }]
+        : [{ userId: user.id }],
+    });
+    const memberDeviceIds = memberRecords.map((m) => m.deviceId);
+
+    const qb = this.deviceRepository
+      .createQueryBuilder('device')
+      .leftJoinAndSelect('device.settings', 'settings');
+
+    if (memberDeviceIds.length > 0) {
+      qb.where('device.ownerId = :userId OR device.id IN (:...memberDeviceIds)', {
+        userId: user.id,
+        memberDeviceIds,
+      });
+    } else {
+      qb.where('device.ownerId = :userId', { userId: user.id });
+    }
+
+    // Always include default feeder if owned by default owner
+    qb.orWhere('device.ownerId = :defaultOwner', { defaultOwner: 'owner_bff_user' });
+
+    qb.orderBy('device.createdAt', 'ASC');
+
+    let devices = await qb.getMany();
+
+    if (devices.length === 0) {
+      const defaultDev = await this.ensureDefaultDevice('feeder_esp32_01');
+      devices = [defaultDev];
+    }
+
+    return devices;
+  }
+
   async getDevice(id: string): Promise<Device> {
     let device = await this.deviceRepository.findOne({
       where: { id },
