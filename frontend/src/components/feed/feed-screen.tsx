@@ -14,6 +14,8 @@ import { FeedActuatorCard } from './feed-actuator-card';
 import { FoodStorageAndGoalsCard } from './food-storage-and-goals-card';
 import { MealStatusCards } from './meal-status-cards';
 
+import { OnboardingScreen } from '@/components/onboarding/onboarding-screen';
+
 interface FeedScreenProps {
   activeDevice?: FeederDevice;
   onFeedSuccess?: (event: FeedingEvent) => void;
@@ -23,6 +25,20 @@ interface FeedScreenProps {
 export function FeedScreen(props: FeedScreenProps = {}) {
   const context = useFeederContext();
   const activeDevice = props.activeDevice || context.activeDevice;
+
+  if (!activeDevice || !context.devices || context.devices.length === 0) {
+    return <OnboardingScreen />;
+  }
+
+  return <FeedDashboard {...props} activeDevice={activeDevice} />;
+}
+
+function FeedDashboard({
+  activeDevice,
+  onFeedSuccess,
+  onNavigateScreen,
+}: FeedScreenProps & { activeDevice: FeederDevice }) {
+  const context = useFeederContext();
 
   const presets = activeDevice.customPresets || DEFAULT_PORTION_PRESETS;
   const [activePresetId, setActivePresetId] = useState<string | null>('bowl');
@@ -97,8 +113,8 @@ export function FeedScreen(props: FeedScreenProps = {}) {
   ]);
 
   const handleFeedSuccess = (event: FeedingEvent) => {
-    if (props.onFeedSuccess) {
-      props.onFeedSuccess(event);
+    if (onFeedSuccess) {
+      onFeedSuccess(event);
     } else {
       context.addHistoryEvent(event);
     }

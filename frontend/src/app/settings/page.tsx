@@ -3,8 +3,9 @@ import { Suspense } from 'react';
 import { SettingsScreen } from '@/components/settings/settings-screen';
 
 export const metadata: Metadata = {
-  title: 'ចិញ្ចឹម (ChinChem) | Feeder & Fleet Settings',
-  description: 'Manage feeder devices, household member access, and Telegram notifications.',
+  title: 'Device & Telegram Settings',
+  description:
+    'Manage hardware feeders, household family access, custom melody chime alerts, and Telegram group feeding permissions.',
 };
 
 export default function SettingsPage() {

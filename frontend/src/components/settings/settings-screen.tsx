@@ -28,6 +28,8 @@ import { RevokeMemberModal } from './modals/revoke-member-modal';
 import { InviteMemberModal } from '@/components/devices/invite-member-modal';
 import { DeviceQrStickerModal } from '@/components/devices/device-qr-sticker-modal';
 
+import { Radio, Plus, Sparkles } from 'lucide-react';
+
 interface SettingsScreenProps {
   devices?: FeederDevice[];
   activeDevice?: FeederDevice;
@@ -38,7 +40,53 @@ export function SettingsScreen(props: SettingsScreenProps = {}) {
   const context = useFeederContext();
   const devices = props.devices || context.devices;
   const activeDevice = props.activeDevice || context.activeDevice;
-  const onSelectDevice = props.onSelectDevice || context.switchDevice;
+
+  if (!activeDevice || !devices || devices.length === 0) {
+    return (
+      <div className="w-full flex flex-col gap-4 animate-fadeIn">
+        <div className="w-full flex flex-col items-center justify-center p-6 text-center bg-white/70 backdrop-blur-md rounded-3xl border border-[#143503]/10 shadow-sm gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#143503]/8 text-[#143503] flex items-center justify-center">
+            <Radio size={28} />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-[#143503]">No Feeder Registered</h2>
+            <p className="text-xs text-[#4B633E] mt-1 max-w-xs leading-relaxed">
+              Pair your hardware feeder to configure alert tones, household access, and Telegram group settings.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full max-w-xs">
+            <button
+              type="button"
+              onClick={() => context.setIsAddDeviceOpen(true)}
+              className="flex-1 py-2.5 rounded-2xl bg-[#143503] text-[#FFF2E6] text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:bg-[#143503]/90 transition-all cursor-pointer active:scale-95"
+            >
+              <Plus size={14} />
+              <span>Pair Feeder</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => context.loadDemoData()}
+              className="flex-1 py-2.5 rounded-2xl bg-white border border-[#143503]/15 text-[#143503] text-xs font-bold flex items-center justify-center gap-2 shadow-xs hover:bg-[#FFF2E6] transition-all cursor-pointer active:scale-95"
+            >
+              <Sparkles size={14} className="text-amber-600" />
+              <span>Load Demo</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return <SettingsDashboard {...props} activeDevice={activeDevice} devices={devices} />;
+}
+
+function SettingsDashboard({
+  activeDevice,
+  devices,
+  onSelectDevice: propSelectDevice,
+}: SettingsScreenProps & { activeDevice: FeederDevice; devices: FeederDevice[] }) {
+  const context = useFeederContext();
+  const onSelectDevice = propSelectDevice || context.switchDevice;
 
   const { members, createInvite, removeMember } = useDeviceMembers(activeDevice.id);
 

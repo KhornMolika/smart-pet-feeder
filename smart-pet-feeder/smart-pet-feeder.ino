@@ -52,8 +52,8 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "AUB-4F-A";
-const char* WIFI_PASSWORD = "";
+const char* WIFI_SSID     = "moly";
+const char* WIFI_PASSWORD = "22224455";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
@@ -183,22 +183,58 @@ void armDemoSchedule(FeederDateTime dt) {
 }
 
 // ----------------------------------------------------------------------------
+// I2C BUS RECOVERY (Clears hung SDA/SCL lines from prior resets)
+// ----------------------------------------------------------------------------
+void recoverI2CBus() {
+  pinMode(PIN_I2C_SDA, INPUT_PULLUP);
+  pinMode(PIN_I2C_SCL, OUTPUT);
+  for (int i = 0; i < 16; i++) {
+    digitalWrite(PIN_I2C_SCL, LOW);
+    delayMicroseconds(5);
+    digitalWrite(PIN_I2C_SCL, HIGH);
+    delayMicroseconds(5);
+  }
+  // Generate STOP condition
+  pinMode(PIN_I2C_SDA, OUTPUT);
+  digitalWrite(PIN_I2C_SDA, LOW);
+  delayMicroseconds(5);
+  digitalWrite(PIN_I2C_SCL, HIGH);
+  delayMicroseconds(5);
+  digitalWrite(PIN_I2C_SDA, HIGH);
+  delayMicroseconds(5);
+}
+
+// ----------------------------------------------------------------------------
 // DS3231 RTC INTERFACE
 // ----------------------------------------------------------------------------
 void rtcInit() {
-  if (!rtc.begin()) {
+  Serial.println(F("[RTC] Probing DS3231 on I2C address 0x68..."));
+  Serial.flush();
+
+  if (!rtc.begin(&Wire)) {
     rtcAvailable = false;
-    Serial.println(F("[RTC] DS3231 not found. Check SDA=21, SCL=22, VCC and GND."));
+    Serial.println(F("[RTC] ⚠️ DS3231 not responding at 0x68. Continuing with internal time/NTP."));
+    Serial.flush();
     return;
   }
 
   rtcAvailable = true;
-  Serial.println(F("[RTC] DS3231 detected on I2C address 0x68."));
+  Serial.println(F("[RTC] ✅ DS3231 detected on I2C address 0x68."));
+  Serial.flush();
 
-  if (rtc.lostPower()) {
-    Serial.println(F("[RTC] Battery/time may have been lost. Waiting for NTP or compile-time fallback."));
-    // Temporary fallback; NTP will correct this after Wi-Fi connects.
+  // Test reading RTC status safely
+  bool lost = false;
+  lost = rtc.lostPower();
+
+  if (lost) {
+    Serial.println(F("[RTC] ⚠️ Battery low or time uninitialized. Setting fallback time..."));
+    Serial.flush();
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  } else {
+    DateTime now = rtc.now();
+    Serial.printf("[RTC] ✅ Hardware clock running: %04d-%02d-%02d %02d:%02d:%02d\n",
+                  now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+    Serial.flush();
   }
 }
 
@@ -241,10 +277,18 @@ void buzzerBeepError() {
 // SERVO CONTROL & DISPENSE ENGINE
 // ----------------------------------------------------------------------------
 void closeGate() {
+  if (!foodServo.attached()) {
+    foodServo.attach(PIN_SERVO, 500, 2400);
+  }
   foodServo.write(SERVO_CLOSED_ANGLE);
+  delay(300); // Allow physical arm to reach mechanical close
+  foodServo.detach(); // De-energize servo to prevent buzzing, heat & brownout
 }
 
 void openGate() {
+  if (!foodServo.attached()) {
+    foodServo.attach(PIN_SERVO, 500, 2400);
+  }
   foodServo.write(SERVO_OPEN_ANGLE);
 }
 
@@ -478,15 +522,22 @@ void updateLcd(FeederDateTime dt) {
 // ----------------------------------------------------------------------------
 void setup() {
   Serial.begin(115200);
-  Serial.println(F("[Feeder] Booting ESP32 Smart Pet Feeder..."));
+  delay(100); // Allow UART clock to stabilize
+  Serial.println(F("\n[Feeder] Booting ESP32 Smart Pet Feeder..."));
+  Serial.flush();
 
   // 1. GPIO Pin Modes
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
 
-  // 2. Initialize LCD
+  // 2. Clear I2C Bus & Initialize LCD Display
+  Serial.println(F("[I2C] Clearing bus lines & initializing Wire..."));
+  Serial.flush();
+  recoverI2CBus();
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Wire.setTimeOut(100); // 100ms hardware timeout prevents CPU hang forever!
+
   lcd.init();
   lcd.backlight();
   lcd.clear();
@@ -494,13 +545,25 @@ void setup() {
   lcd.print("Smart Pet Feeder");
   lcd.setCursor(0, 1);
   lcd.print("Initializing...");
+  Serial.println(F("[LCD] 16x2 Display initialized."));
+  Serial.flush();
 
   // 3. Initialize DS3231 RTC on I2C
   rtcInit();
 
-  // 4. Initialize Servo
-  foodServo.attach(PIN_SERVO);
-  closeGate(); // Ensure closed gate on boot
+  // 4. Initialize Servo with PWM Timer Allocation & Sleep State
+  Serial.println(F("[Servo] Allocating PWM timers & configuring 50Hz..."));
+  Serial.flush();
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+  foodServo.setPeriodHertz(50);
+  Serial.println(F("[Servo] Calibrating dispenser gate to closed position..."));
+  Serial.flush();
+  closeGate(); // Attaches, writes 0°, waits 300ms, detaches
+  Serial.println(F("[Servo] Gate secured closed. Servo motor asleep (0mA idle)."));
+  Serial.flush();
 
   // 5. Default Schedules
   schedules[0] = { true, 7, 30, 700, "Breakfast" };
@@ -511,6 +574,7 @@ void setup() {
   Serial.println(F("\n=================================================="));
   Serial.printf("[WiFi] Connecting to SSID: '%s'...\n", WIFI_SSID);
   Serial.println(F("=================================================="));
+  Serial.flush();
 
   lcd.clear();
   lcd.setCursor(0, 0);

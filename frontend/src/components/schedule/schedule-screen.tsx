@@ -17,6 +17,8 @@ import { PortionTimersCard } from '@/components/settings/cards/portion-timers-ca
 import { ScheduleFormModal } from '@/components/settings/modals/schedule-form-modal';
 import { DeleteScheduleModal } from '@/components/settings/modals/delete-schedule-modal';
 
+import { Calendar, Plus } from 'lucide-react';
+
 interface ScheduleScreenProps {
   activeDevice?: FeederDevice;
   onUpdateDevicePresets?: (deviceId: string, presets: PortionPreset[]) => void;
@@ -25,7 +27,40 @@ interface ScheduleScreenProps {
 export function ScheduleScreen(props: ScheduleScreenProps = {}) {
   const context = useFeederContext();
   const activeDevice = props.activeDevice || context.activeDevice;
-  const onUpdateDevicePresets = props.onUpdateDevicePresets || context.updateDevicePresets;
+
+  if (!activeDevice || !context.devices || context.devices.length === 0) {
+    return (
+      <div className="w-full flex flex-col items-center justify-center p-6 text-center bg-white/70 backdrop-blur-md rounded-3xl border border-[#143503]/10 shadow-sm mt-4 gap-4 animate-fadeIn">
+        <div className="w-14 h-14 rounded-2xl bg-[#143503]/8 text-[#143503] flex items-center justify-center">
+          <Calendar size={28} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-[#143503]">No Feeder Connected</h2>
+          <p className="text-xs text-[#4B633E] mt-1 max-w-xs leading-relaxed">
+            Pair your physical ChinChem feeder to schedule automated breakfast, lunch, and dinner alarms.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => context.setIsAddDeviceOpen(true)}
+          className="px-5 py-2.5 rounded-2xl bg-[#143503] text-[#FFF2E6] text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-[#143503]/90 transition-all cursor-pointer active:scale-95"
+        >
+          <Plus size={14} />
+          <span>Pair Feeder</span>
+        </button>
+      </div>
+    );
+  }
+
+  return <ScheduleDashboard {...props} activeDevice={activeDevice} />;
+}
+
+function ScheduleDashboard({
+  activeDevice,
+  onUpdateDevicePresets: propUpdatePresets,
+}: ScheduleScreenProps & { activeDevice: FeederDevice }) {
+  const context = useFeederContext();
+  const onUpdateDevicePresets = propUpdatePresets || context.updateDevicePresets;
   const onUpdateDeviceTarget = context.updateDeviceTarget;
 
   const { schedules, addSchedule, updateSchedule, toggleSchedule, deleteSchedule, syncSchedulesToTarget } =

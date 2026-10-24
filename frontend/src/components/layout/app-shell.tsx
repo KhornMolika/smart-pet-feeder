@@ -38,8 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const startParam = getTelegramStartParam();
     if (!startParam) return;
 
-    if (startParam.startsWith('claim_')) {
-      setClaimToken(startParam);
+    if (startParam.startsWith('claim_') || startParam.startsWith('feeder_') || startParam.startsWith('feeder-')) {
+      const formattedToken = startParam.startsWith('claim_') ? startParam : `claim_${startParam}`;
+      setClaimToken(formattedToken);
       setIsAddDeviceOpen(true);
       triggerNotificationHaptic('success');
     } else if (startParam.startsWith('join_')) {

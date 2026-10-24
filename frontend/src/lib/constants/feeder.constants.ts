@@ -37,7 +37,7 @@ export const DEFAULT_PORTION_PRESETS: PortionPreset[] = [
   },
 ];
 
-export const INITIAL_DEVICES: FeederDevice[] = [
+export const DEMO_DEVICES: FeederDevice[] = [
   {
     id: 'feeder-esp32-001',
     name: 'Feeder Pro 1',
@@ -82,7 +82,10 @@ export const INITIAL_DEVICES: FeederDevice[] = [
   },
 ];
 
-export const INITIAL_SCHEDULES: FeedingSchedule[] = [
+// Default clean state for first-time users (0 devices)
+export const INITIAL_DEVICES: FeederDevice[] = [];
+
+export const DEMO_SCHEDULES: FeedingSchedule[] = [
   {
     id: 'sched-1',
     deviceId: 'feeder-esp32-001',
@@ -130,7 +133,9 @@ export const INITIAL_SCHEDULES: FeedingSchedule[] = [
   },
 ];
 
-export const INITIAL_HISTORY: FeedingEvent[] = [
+export const INITIAL_SCHEDULES: FeedingSchedule[] = [];
+
+export const DEMO_HISTORY: FeedingEvent[] = [
   {
     id: 'hist-0a',
     deviceId: 'feeder-esp32-001',
@@ -220,6 +225,8 @@ export const INITIAL_HISTORY: FeedingEvent[] = [
     note: 'Scheduled Meal: Evening Dinner',
   },
 ];
+
+export const INITIAL_HISTORY: FeedingEvent[] = [];
 
 export const DAYS_OF_WEEK = [
   { value: 1, label: 'Mon', full: 'Monday' },

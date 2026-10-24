@@ -8,7 +8,7 @@ import { useDeviceHistory } from '@/hooks/useDeviceHistory';
 interface FeederContextType {
   // Fleet & Active Device
   devices: FeederDevice[];
-  activeDevice: FeederDevice;
+  activeDevice: FeederDevice | null;
   activeDeviceId: string;
   switchDevice: (id: string) => void;
   addDevice: (data: {
@@ -33,6 +33,8 @@ interface FeederContextType {
       groupGuestFeedAllowed?: boolean;
     },
   ) => void;
+  loadDemoData: () => void;
+  resetFleet: () => void;
 
   // History & Logs
   history: FeedingEvent[];

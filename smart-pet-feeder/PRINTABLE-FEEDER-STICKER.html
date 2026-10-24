@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChinChem Smart Pet Feeder — Factory Pairing Sticker</title>
+  <style>
+    :root {
+      --palm-leaf: #143503;
+      --cream: #FFF2E6;
+      --accent: #A7D1AE;
+      --border-green: #143503;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #F0F2F5;
+      color: #1F2937;
+      padding: 32px 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toolbar {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(20, 53, 3, 0.12);
+      box-shadow: 0 10px 25px -5px rgba(20, 53, 3, 0.07), 0 4px 8px -2px rgba(20, 53, 3, 0.03);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 340px;
+      max-width: 100%;
+      margin-bottom: 20px;
+    }
+
+    .toolbar-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .toolbar-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: #EAF3EC;
+      color: var(--palm-leaf);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .toolbar-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .toolbar-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .toolbar-title {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--palm-leaf);
+      letter-spacing: -0.2px;
+    }
+
+    .toolbar-chip {
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--palm-leaf);
+      background: #E0EFE2;
+      padding: 2px 6px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .toolbar-subtitle {
+      font-size: 11px;
+      color: #6B7280;
+      line-height: 1.25;
+      margin: 0;
+    }
+
+    .actions-group {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 8px;
+      width: 100%;
+    }
+
+    .btn {
+      appearance: none;
+      border: none;
+      padding: 9px 12px;
+      border-radius: 11px;
+      font-weight: 700;
+      font-size: 12.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      text-decoration: none;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-primary {
+      background-color: var(--palm-leaf);
+      color: #FFFFFF;
+      box-shadow: 0 4px 10px rgba(20, 53, 3, 0.2);
+    }
+
+    .btn-primary:hover {
+      background-color: #1b4704;
+      box-shadow: 0 6px 14px rgba(20, 53, 3, 0.28);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background-color: #F8FAF8;
+      color: var(--palm-leaf);
+      border: 1.2px solid rgba(20, 53, 3, 0.18);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--cream);
+      border-color: var(--palm-leaf);
+      transform: translateY(-1px);
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spin-animation {
+      animation: spin 0.8s linear infinite;
+    }
+
+    /* Sticker Presentation Sheet */
+    .sheet {
+      background: transparent;
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+    }
+
+    /* The Physical Hardware Sticker Badge (Matching User Reference) */
+    .sticker-badge {
+      border: 3px solid var(--palm-leaf);
+      border-radius: 24px;
+      padding: 24px 22px 18px 22px;
+      background: #FFFFFF;
+      width: 340px;
+      max-width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(20, 53, 3, 0.12);
+      margin: 0 auto;
+    }
+
+    .sticker-badge::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: var(--palm-leaf);
+    }
+
+    .badge-logo {
+      font-size: 23px;
+      font-weight: 900;
+      color: var(--palm-leaf);
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+      line-height: 1.2;
+    }
+
+    .badge-subtitle {
+      font-size: 11px;
+      font-weight: 800;
+      color: #4B633E;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+      margin-bottom: 16px;
+    }
+
+    .qr-frame {
+      background: #FFFFFF;
+      border: 1.5px solid rgba(20, 53, 3, 0.2);
+      border-radius: 18px;
+      padding: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+
+    .qr-frame img {
+      width: 210px;
+      height: 210px;
+      display: block;
+      border-radius: 4px;
+    }
+
+    .scan-instruction {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--palm-leaf);
+      background: var(--cream);
+      border: 1px solid rgba(20, 53, 3, 0.18);
+      padding: 8px 18px;
+      border-radius: 24px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 14px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .device-info {
+      font-size: 10.5px;
+      color: #4B5563;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      line-height: 1.55;
+      background: #F9FAFB;
+      border: 1px solid #E5E7EB;
+      padding: 9px 14px;
+      border-radius: 10px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .device-info strong {
+      color: var(--palm-leaf);
+      font-weight: 700;
+    }
+
+    .cut-guide {
+      font-size: 10.5px;
+      color: #9CA3AF;
+      margin-top: 12px;
+      font-style: italic;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Print Styles (Strict Clean Output for Scissors Cutting) */
+    @media print {
+      body {
+        background: #FFFFFF !important;
+        padding: 0 !important;
+        justify-content: center !important;
+      }
+
+      .toolbar {
+        display: none !important;
+      }
+
+      .sheet {
+        box-shadow: none !important;
+        border-radius: 0 !important;
+        padding: 15mm 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+      }
+
+      .sticker-badge {
+        break-inside: avoid;
+        box-shadow: none !important;
+        border: 2.5px solid #000000 !important;
+      }
+
+      .sticker-badge::before {
+        background: #000000 !important;
+      }
+
+      .qr-frame {
+        border-color: #000000 !important;
+      }
+
+      .scan-instruction {
+        background: #F3F4F6 !important;
+        color: #000000 !important;
+        border: 1px solid #999999 !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Manufacturer Toolbar -->
+  <div class="toolbar">
+    <div class="toolbar-header">
+      <div class="toolbar-icon">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+          <line x1="7" y1="7" x2="7.01" y2="7"/>
+        </svg>
+      </div>
+      <div class="toolbar-text">
+        <div class="toolbar-title-row">
+          <span class="toolbar-title">Pairing Sticker</span>
+          <span class="toolbar-chip">ESP32-01</span>
+        </div>
+        <p class="toolbar-subtitle">Export image or print physical badge</p>
+      </div>
+    </div>
+
+    <div class="actions-group">
+      <!-- Download Sticker Badge Image Button -->
+      <button class="btn btn-primary" onclick="downloadStickerImage()" id="btnDownload">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span>Download PNG</span>
+      </button>
+
+      <!-- Print Sticker Button -->
+      <button class="btn btn-secondary" onclick="window.print()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9"/>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        <span>Print</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Centered Sticker Sheet -->
+  <div class="sheet">
+
+    <!-- The Exact Physical Sticker Badge -->
+    <div class="sticker-badge" id="stickerBadge">
+      <div class="badge-logo">ចិញ្ចឹម (ChinChem)</div>
+      <div class="badge-subtitle">SMART PET FEEDER</div>
+
+      <div class="qr-frame">
+        <img
+          id="qrCodeImg"
+          crossorigin="anonymous"
+          src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=4&ecc=H&color=20-53-3&bgcolor=ffffff&data=https%3A%2F%2Ft.me%2FChinChemBot%2Fapp%3Fstartapp%3Dclaim_feeder_esp32_01"
+          alt="Feeder Pairing QR Code">
+      </div>
+
+      <div class="scan-instruction">
+        <span>📱</span>
+        <span>Scan with Phone Camera to Pair</span>
+      </div>
+
+      <div class="device-info">
+        <div>DEVICE ID: <strong>feeder_esp32_01</strong></div>
+        <div>AUTH REF: <strong>claim_feeder_esp32_01</strong></div>
+        <div>LINK: <strong>t.me/ChinChemBot/app</strong></div>
+      </div>
+
+      <div class="cut-guide">
+        <span>✂️</span>
+        <span>Cut along outer line</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Hidden high-res canvas used for rendering the entire sticker badge -->
+  <canvas id="exportCanvas" style="display: none;"></canvas>
+
+  <script>
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    async function downloadStickerImage() {
+      const btn = document.getElementById('btnDownload');
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `
+        <svg class="spin-animation" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
+        </svg>
+        <span>Exporting...</span>
+      `;
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.75';
+
+      try {
+        const qrImg = document.getElementById('qrCodeImg');
+
+        // Ensure QR image is fully loaded
+        if (!qrImg.complete) {
+          await new Promise((resolve) => { qrImg.onload = resolve; });
+        }
+
+        // Render High-DPI Sticker (Canvas size: 680 x 1060 for razor sharp 300 DPI print)
+        const canvas = document.getElementById('exportCanvas');
+        const W = 680;
+        const H = 1060;
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // 1. Transparent background
+        ctx.clearRect(0, 0, W, H);
+
+        // 2. White Card with 2.5px Forest Green Border
+        const padding = 20;
+        const cardX = padding;
+        const cardY = padding;
+        const cardW = W - padding * 2;
+        const cardH = H - padding * 2;
+        const cardRadius = 48;
+
+        // Card fill
+        roundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+
+        // Card Border
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#143503';
+        ctx.stroke();
+
+        // 3. Top Accent Bar (Clipped to card curve)
+        ctx.save();
+        roundRect(ctx, cardX, cardY, cardW, cardH, cardRadius);
+        ctx.clip();
+        ctx.fillStyle = '#143503';
+        ctx.fillRect(cardX, cardY, cardW, 16);
+        ctx.restore();
+
+        // 4. Logo Typography: ចិញ្ចឹម (ChinChem)
+        ctx.fillStyle = '#143503';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = '900 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText('ចិញ្ចឹម (ChinChem)', W / 2, 88);
+
+        // Subtitle: SMART PET FEEDER
+        ctx.fillStyle = '#4B633E';
+        ctx.font = '800 22px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText('S M A R T   P E T   F E E D E R', W / 2, 134);
+
+        // 5. QR Code Frame Box
+        const qrBoxSize = 460;
+        const qrBoxX = (W - qrBoxSize) / 2;
+        const qrBoxY = 175;
+        const qrBoxRadius = 36;
+
+        roundRect(ctx, qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, qrBoxRadius);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(20, 53, 3, 0.22)';
+        ctx.stroke();
+
+        // Draw QR Image inside frame
+        const qrImgMargin = 28;
+        const qrImgSize = qrBoxSize - qrImgMargin * 2;
+        ctx.drawImage(qrImg, qrBoxX + qrImgMargin, qrBoxY + qrImgMargin, qrImgSize, qrImgSize);
+
+        // 6. Pill: 📱 Scan with Phone Camera to Pair
+        const pillW = 440;
+        const pillH = 64;
+        const pillX = (W - pillW) / 2;
+        const pillY = 675;
+        const pillRadius = 32;
+
+        roundRect(ctx, pillX, pillY, pillW, pillH, pillRadius);
+        ctx.fillStyle = '#FFF2E6';
+        ctx.fill();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = 'rgba(20, 53, 3, 0.25)';
+        ctx.stroke();
+
+        ctx.fillStyle = '#143503';
+        ctx.font = '800 23px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillText('📱  Scan with Phone Camera to Pair', W / 2, pillY + pillH / 2);
+
+        // 7. Device Info Box
+        const infoW = 540;
+        const infoH = 145;
+        const infoX = (W - infoW) / 2;
+        const infoY = 770;
+        const infoRadius = 20;
+
+        roundRect(ctx, infoX, infoY, infoW, infoH, infoRadius);
+        ctx.fillStyle = '#F9FAFB';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#E5E7EB';
+        ctx.stroke();
+
+        // Device Info Text
+        ctx.textAlign = 'left';
+        ctx.font = '500 20px ui-monospace, Menlo, Consolas, monospace';
+        const lineX = infoX + 24;
+
+        ctx.fillStyle = '#6B7280';
+        ctx.fillText('DEVICE ID: ', lineX, infoY + 36);
+        ctx.fillStyle = '#143503';
+        ctx.font = '800 20px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillText('feeder_esp32_01', lineX + 130, infoY + 36);
+
+        ctx.font = '500 20px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillStyle = '#6B7280';
+        ctx.fillText('AUTH REF:  ', lineX, infoY + 76);
+        ctx.fillStyle = '#143503';
+        ctx.font = '800 20px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillText('claim_feeder_esp32_01', lineX + 130, infoY + 76);
+
+        ctx.font = '500 20px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillStyle = '#6B7280';
+        ctx.fillText('LINK:      ', lineX, infoY + 116);
+        ctx.fillStyle = '#143503';
+        ctx.font = '800 20px ui-monospace, Menlo, Consolas, monospace';
+        ctx.fillText('t.me/ChinChemBot/app', lineX + 130, infoY + 116);
+
+        // 8. Cut Guide Text at bottom
+        ctx.textAlign = 'center';
+        ctx.font = 'italic 19px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.fillStyle = '#9CA3AF';
+        ctx.fillText('✂️ Cut along outer line', W / 2, 955);
+
+        // Trigger Download
+        canvas.toBlob((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'chinchem-feeder-pairing-sticker.png';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          btn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span>Saved!</span>
+          `;
+          setTimeout(() => {
+            btn.innerHTML = originalHTML;
+            btn.style.pointerEvents = '';
+            btn.style.opacity = '1';
+          }, 2000);
+        }, 'image/png');
+
+      } catch (err) {
+        console.error('Failed to export sticker canvas:', err);
+        btn.innerHTML = '<span>Export Failed</span>';
+        setTimeout(() => {
+          btn.innerHTML = originalHTML;
+          btn.style.pointerEvents = '';
+          btn.style.opacity = '1';
+        }, 2500);
+      }
+    }
+  </script>
+
+</body>
+
+</html>

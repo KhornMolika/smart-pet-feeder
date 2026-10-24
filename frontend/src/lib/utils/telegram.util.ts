@@ -94,6 +94,91 @@ export function getTelegramInitData(): string | null {
   );
 }
 
+/**
+ * Extract claim token from raw QR code text or URL
+ * e.g. "https://t.me/ChinChemBot/app?startapp=claim_feeder_esp32_01" -> "claim_feeder_esp32_01"
+ * e.g. "claim_feeder_esp32_01" -> "claim_feeder_esp32_01"
+ * e.g. "feeder_esp32_01" -> "claim_feeder_esp32_01"
+ */
+export function parseFeederClaimToken(rawInput: string): string | null {
+  if (!rawInput) return null;
+  const trimmed = rawInput.trim();
+
+  // If it's a URL
+  try {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('tg://')) {
+      const url = new URL(trimmed);
+      const startParam =
+        url.searchParams.get('startapp') ||
+        url.searchParams.get('start') ||
+        url.searchParams.get('claim') ||
+        url.searchParams.get('tgWebAppStartParam');
+      if (startParam) {
+        return startParam.startsWith('claim_') ? startParam : `claim_${startParam}`;
+      }
+    }
+  } catch {}
+
+  // If raw token or device id
+  if (trimmed.startsWith('claim_')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('feeder_') || trimmed.startsWith('feeder-')) {
+    return `claim_${trimmed}`;
+  }
+
+  return trimmed;
+}
+
+/**
+ * Open Telegram WebApp native QR scanner popup
+ * Returns true if native Telegram QR scanner is supported and opened, false otherwise
+ */
+export function openTelegramQrScanner(
+  promptText: string,
+  onScan: (scannedText: string) => boolean | void,
+): boolean {
+  if (typeof window === 'undefined') return false;
+
+  try {
+    const tg = (window as unknown as {
+      Telegram?: {
+        WebApp?: {
+          showScanQrPopup?: (
+            params: { text?: string },
+            callback: (text: string) => boolean | void,
+          ) => void;
+          closeScanQrPopup?: () => void;
+        };
+      };
+    }).Telegram?.WebApp;
+
+    if (typeof tg?.showScanQrPopup === 'function') {
+      tg.showScanQrPopup({ text: promptText }, (text: string) => {
+        const close = onScan(text);
+        return close ?? true;
+      });
+      return true;
+    }
+  } catch {}
+
+  return false;
+}
+
+export function closeTelegramQrScanner() {
+  if (typeof window === 'undefined') return;
+  try {
+    const tg = (window as unknown as {
+      Telegram?: {
+        WebApp?: {
+          closeScanQrPopup?: () => void;
+        };
+      };
+    }).Telegram?.WebApp;
+    tg?.closeScanQrPopup?.();
+  } catch {}
+}
+
 export interface NotificationAlertConfig {
   telegramEnabled: boolean;
   mealServedAlert: boolean;

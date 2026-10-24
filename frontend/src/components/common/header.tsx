@@ -9,7 +9,7 @@ import { PetIcon } from '@/components/common/pet-icon';
 
 interface HeaderProps {
   devices: FeederDevice[];
-  activeDevice: FeederDevice;
+  activeDevice: FeederDevice | null;
   onSelectDevice: (deviceId: string) => void;
   onOpenAddDevice: () => void;
 }
@@ -33,6 +33,41 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
     onSelectDevice(id);
     setShowPicker(false);
   };
+
+  const hasDevices = Boolean(devices && devices.length > 0 && activeDevice);
+
+  if (!hasDevices || !activeDevice) {
+    return (
+      <header className="w-full flex items-center justify-between gap-2.5 py-2.5 relative z-30 select-none">
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <Image
+            src="/images/logo.png"
+            alt="ចិញ្ចឹម (ChinChem)"
+            width={30}
+            height={20}
+            priority
+            style={{ width: 'auto', height: 'auto' }}
+            className="h-5 sm:h-6 w-auto object-contain shrink-0 filter drop-shadow-[0_1px_2px_rgba(20,53,3,0.08)]"
+          />
+          <span className="text-xs font-black tracking-wider text-[#143503]/75 uppercase">
+            ChinChem
+          </span>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            triggerHaptic('medium');
+            onOpenAddDevice();
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#143503] text-[#FFF2E6] text-xs font-bold shadow-xs hover:bg-[#143503]/90 transition-all cursor-pointer active:scale-95"
+        >
+          <Plus size={13} />
+          <span>Pair Feeder</span>
+        </button>
+      </header>
+    );
+  }
 
   return (
     <header className="w-full flex items-center justify-between gap-2.5 py-2.5 relative z-30 select-none">

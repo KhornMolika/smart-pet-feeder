@@ -3,8 +3,9 @@ import { Suspense } from 'react';
 import { HistoryScreen } from '@/components/history/history-screen';
 
 export const metadata: Metadata = {
-  title: 'ចិញ្ចឹម (ChinChem) | Feeding History & Logs',
-  description: 'View real-time dispensing logs and export feeding records.',
+  title: 'Feeding History & Dispense Logs',
+  description:
+    'Review real-time meal dispensing activity, monitor portion durations, and export historical feeding records.',
 };
 
 export default function HistoryPage() {

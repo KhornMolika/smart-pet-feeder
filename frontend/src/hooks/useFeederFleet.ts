@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FeederDevice, PortionPreset } from '@/types/feeder.types';
-import { INITIAL_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
+import { INITIAL_DEVICES, DEMO_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
 
 import { getBackendApiUrl } from '@/lib/api-config';
 
@@ -11,7 +11,7 @@ const STORAGE_KEY_ACTIVE_ID = 'chinchum_active_device_id';
 
 export function useFeederFleet() {
   const [devices, setDevices] = useState<FeederDevice[]>(INITIAL_DEVICES);
-  const [activeDeviceId, setActiveDeviceId] = useState<string>(INITIAL_DEVICES[0].id);
+  const [activeDeviceId, setActiveDeviceId] = useState<string>('');
 
   // Sync saved fleet data from localStorage after client hydration to prevent SSR mismatch
   useEffect(() => {
@@ -21,11 +21,14 @@ export function useFeederFleet() {
         const parsed = JSON.parse(storedDevices);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setDevices(parsed);
+          const storedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
+          if (storedActiveId && parsed.some((d: FeederDevice) => d.id === storedActiveId)) {
+            setActiveDeviceId(storedActiveId);
+          } else {
+            setActiveDeviceId(parsed[0].id);
+          }
+          return;
         }
-      }
-      const storedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
-      if (storedActiveId) {
-        setActiveDeviceId(storedActiveId);
       }
     } catch {}
   }, []);
@@ -42,6 +45,24 @@ export function useFeederFleet() {
     setActiveDeviceId(id);
     try {
       localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
+    } catch {}
+  };
+
+  const loadDemoData = () => {
+    saveDevices(DEMO_DEVICES);
+    if (DEMO_DEVICES.length > 0) {
+      switchDevice(DEMO_DEVICES[0].id);
+    }
+  };
+
+  const resetFleet = () => {
+    setDevices([]);
+    setActiveDeviceId('');
+    try {
+      localStorage.removeItem(STORAGE_KEY_DEVICES);
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_ID);
+      localStorage.removeItem('chinchum_schedules');
+      localStorage.removeItem('chinchum_history');
     } catch {}
   };
 
@@ -131,15 +152,19 @@ export function useFeederFleet() {
   };
 
   const removeDevice = (deviceId: string): boolean => {
-    if (devices.length <= 1) {
-      return false; // Guard: Cannot delete the only remaining device
-    }
     const remaining = devices.filter((d) => d.id !== deviceId);
     saveDevices(remaining);
 
-    // If currently active device was removed, switch to the first remaining device
+    // If currently active device was removed, switch to the first remaining device or empty
     if (activeDeviceId === deviceId) {
-      switchDevice(remaining[0].id);
+      if (remaining.length > 0) {
+        switchDevice(remaining[0].id);
+      } else {
+        setActiveDeviceId('');
+        try {
+          localStorage.removeItem(STORAGE_KEY_ACTIVE_ID);
+        } catch {}
+      }
     }
 
     // Clean up associated schedules from localStorage
@@ -194,7 +219,7 @@ export function useFeederFleet() {
     });
   };
 
-  const activeDevice = devices.find((d) => d.id === activeDeviceId) || devices[0];
+  const activeDevice = devices.find((d) => d.id === activeDeviceId) || devices[0] || null;
 
   return {
     devices,
@@ -209,5 +234,7 @@ export function useFeederFleet() {
     updateDeviceNextScheduledFeedAt,
     recordDispense,
     updateGroupSettings,
+    loadDemoData,
+    resetFleet,
   };
 }

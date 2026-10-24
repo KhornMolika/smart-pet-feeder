@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { FeederDevice, FeedingEvent, FeedSource } from '@/types/feeder.types';
 import { formatDateHeader, formatDateOnly } from '@/lib/utils/date.util';
-import { Sparkles, Clock, Calendar, CalendarDays, Smartphone, Hand } from 'lucide-react';
+import { Sparkles, Clock, Calendar, CalendarDays, Smartphone, Hand, Plus } from 'lucide-react';
 import { useFeederContext } from '@/context/feeder-context';
 import { TimeframeFilter } from '@/hooks/useDeviceHistory';
 
@@ -21,6 +21,31 @@ interface HistoryScreenProps {
 export function HistoryScreen(props: HistoryScreenProps = {}) {
   const context = useFeederContext();
   const devices = props.devices || context.devices;
+
+  if (!devices || devices.length === 0) {
+    return (
+      <div className="w-full flex flex-col items-center justify-center p-6 text-center bg-white/70 backdrop-blur-md rounded-3xl border border-[#143503]/10 shadow-sm mt-4 gap-4 animate-fadeIn">
+        <div className="w-14 h-14 rounded-2xl bg-[#143503]/8 text-[#143503] flex items-center justify-center">
+          <Clock size={28} />
+        </div>
+        <div>
+          <h2 className="text-base font-bold text-[#143503]">No Feeding Activity</h2>
+          <p className="text-xs text-[#4B633E] mt-1 max-w-xs leading-relaxed">
+            Feeding logs and Telegram dispense events will appear here in real time once your feeder is connected.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => context.setIsAddDeviceOpen(true)}
+          className="px-5 py-2.5 rounded-2xl bg-[#143503] text-[#FFF2E6] text-xs font-bold flex items-center gap-2 shadow-sm hover:bg-[#143503]/90 transition-all cursor-pointer active:scale-95"
+        >
+          <Plus size={14} />
+          <span>Pair Feeder</span>
+        </button>
+      </div>
+    );
+  }
+
   const {
     history,
     allHistory,

@@ -35,6 +35,7 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
   const [petName, setPetName] = useState('');
   const [petEmoji, setPetEmoji] = useState('cat');
   const [room, setRoom] = useState('Living Room');
+  const [hardwareId, setHardwareId] = useState('feeder_esp32_01');
   const [isPairingSuccess, setIsPairingSuccess] = useState(false);
 
   useEffect(() => {
@@ -58,9 +59,10 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
       setPetName('');
       setPetEmoji('cat');
       setRoom('Living Room');
+      setHardwareId(claimToken ? claimToken.replace(/^claim_/, '') : 'feeder_esp32_01');
       setIsPairingSuccess(false);
     }
-  }, [isOpen]);
+  }, [isOpen, claimToken]);
 
   if (!isOpen || !mounted) return null;
 
@@ -71,13 +73,21 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
     triggerHaptic('medium');
     setIsPairingSuccess(true);
 
+    const finalToken =
+      claimToken ||
+      (hardwareId.trim()
+        ? hardwareId.trim().startsWith('claim_')
+          ? hardwareId.trim()
+          : `claim_${hardwareId.trim()}`
+        : undefined);
+
     setTimeout(() => {
       onAddDevice({
         name: `${petName.trim()}'s Feeder Pro`,
         petName: petName.trim(),
         petEmoji,
         room: room.trim() || 'Living Room',
-        claimToken: claimToken || undefined,
+        claimToken: finalToken,
       });
       onClose();
     }, 450);
@@ -231,6 +241,23 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
               className="w-full px-2.5 py-1.5 rounded-xl border border-[#143503]/15 bg-white text-xs font-semibold text-[#143503] outline-none focus:border-[#143503] shadow-xs transition-all"
             />
           </div>
+
+          {/* D. Hardware Device ID (for manual pairing) */}
+          {!claimToken && (
+            <div className="flex flex-col gap-0.5">
+              <label className="text-[11px] font-bold text-[#143503] flex items-center justify-between">
+                <span>Hardware Feeder ID</span>
+                <span className="text-[9px] text-[#4B633E]/70 font-mono">feeder_esp32_01</span>
+              </label>
+              <input
+                type="text"
+                value={hardwareId}
+                onChange={(e) => setHardwareId(e.target.value)}
+                placeholder="e.g. feeder_esp32_01"
+                className="w-full px-2.5 py-1.5 rounded-xl border border-[#143503]/15 bg-white text-xs font-mono font-bold text-[#143503] outline-none focus:border-[#143503] shadow-xs transition-all placeholder:text-[#4B633E]/35"
+              />
+            </div>
+          )}
 
           {/* D. Live Feeder Preview Card */}
           <div className="px-2.5 py-1 rounded-xl bg-white/65 border border-[#143503]/10 flex items-center justify-between gap-2">
