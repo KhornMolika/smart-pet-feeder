@@ -5,6 +5,7 @@ import {
   HttpStatus,
   NotFoundException,
   OnModuleInit,
+  OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
 
@@ -26,6 +27,53 @@ import {
   DEFAULT_SAFETY,
 } from './helpers/feed-safety.helper.js';
 
+function getCurrentTimeInTimezone(tz: string = 'Asia/Phnom_Penh'): {
+  timeStr: string;
+  dayOfWeek: number;
+  dateStr: string;
+} {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(now);
+  const hour = parts.find((p) => p.type === 'hour')?.value.padStart(2, '0') || '00';
+  const minute = parts.find((p) => p.type === 'minute')?.value.padStart(2, '0') || '00';
+
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    weekday: 'short',
+  });
+  const weekdayStr = dayFormatter.format(now);
+  const dayMap: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  const dayOfWeek = dayMap[weekdayStr] ?? now.getDay();
+
+  const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const dateStr = dateFormatter.format(now);
+
+  return {
+    timeStr: `${hour}:${minute}`,
+    dayOfWeek,
+    dateStr,
+  };
+}
+
 function getHardwareDeviceIds(deviceId: string): string[] {
   const ids = new Set<string>();
   if (deviceId) {
@@ -41,9 +89,11 @@ function getHardwareDeviceIds(deviceId: string): string[] {
 }
 
 @Injectable()
-export class FeederService implements OnModuleInit {
+export class FeederService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(FeederService.name);
   private lastFeedTimestamp = 0;
+  private scheduleCheckTimer: NodeJS.Timeout | null = null;
+  private readonly lastTriggeredSchedules = new Set<string>();
 
   constructor(
     @InjectRepository(FeedingSchedule)
@@ -70,43 +120,82 @@ export class FeederService implements OnModuleInit {
     this.mqttService.events.on('feedEvent', async (eventData) => {
       await this.recordHardwareEvent(eventData);
     });
-    await this.seedDefaultSchedules('feeder_esp32_01');
+
+    // Automated Schedule Dispatcher: Evaluates active schedules every 15s
+    // When schedule time arrives, immediately actuates the servo via MQTT and records the event
+    this.scheduleCheckTimer = setInterval(() => {
+      this.evaluateSchedules().catch((err) => {
+        this.logger.error(`[Schedule Engine] Error evaluating schedules: ${err.message}`);
+      });
+    }, 15000);
+    this.logger.log('⏰ Automated Schedule Engine started (15s evaluation cycle).');
   }
 
-  private async seedDefaultSchedules(deviceId: string) {
-    try {
-      const targetId = (deviceId || 'feeder_esp32_01')
-        .replace(/^claim_/, '')
-        .replace(/-/g, '_')
-        .replace(/_001$/, '_01');
-      const count = await this.scheduleRepository.count({ where: { deviceId: targetId } });
-      if (count === 0) {
-        await this.scheduleRepository.save([
-          this.scheduleRepository.create({
-            deviceId: targetId,
-            device: { id: targetId } as any,
-            label: 'Breakfast Crunch',
-            timeLocal: '07:30',
-            daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-            durationMs: 30000,
-            enabled: true,
-            version: 1,
-          }),
-          this.scheduleRepository.create({
-            deviceId: targetId,
-            device: { id: targetId } as any,
-            label: 'Dinner Feast',
-            timeLocal: '18:00',
-            daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-            durationMs: 45000,
-            enabled: true,
-            version: 1,
-          }),
-        ]);
-        this.logger.log(`Seeded default feeding schedules for ${targetId}`);
+  onModuleDestroy() {
+    if (this.scheduleCheckTimer) {
+      clearInterval(this.scheduleCheckTimer);
+      this.scheduleCheckTimer = null;
+    }
+  }
+
+  /**
+   * Evaluates all enabled feeding schedules across devices.
+   * When schedule time arrives, immediately dispatches MQTT feed command to actuate servo and records the event.
+   */
+  async evaluateSchedules() {
+    const { timeStr, dayOfWeek, dateStr } = getCurrentTimeInTimezone('Asia/Phnom_Penh');
+    const enabledSchedules = await this.scheduleRepository.find({
+      where: { enabled: true },
+    });
+
+    for (const schedule of enabledSchedules) {
+      if (schedule.timeLocal !== timeStr) {
+        continue;
       }
-    } catch (err: unknown) {
-      this.logger.warn(`Failed to seed default schedules: ${(err as Error)?.message}`);
+
+      // Check day of week (support both Sunday=0 and Sunday=7)
+      const days = Array.isArray(schedule.daysOfWeek) ? schedule.daysOfWeek : [];
+      const matchesDay = days.includes(dayOfWeek) || (dayOfWeek === 0 && days.includes(7));
+      if (!matchesDay) {
+        continue;
+      }
+
+      // Guard against duplicate actuations within the same minute
+      const triggerKey = `${schedule.id}_${dateStr}_${timeStr}`;
+      if (this.lastTriggeredSchedules.has(triggerKey)) {
+        continue;
+      }
+
+      this.lastTriggeredSchedules.add(triggerKey);
+      if (this.lastTriggeredSchedules.size > 200) {
+        const keys = Array.from(this.lastTriggeredSchedules);
+        for (let i = 0; i < 100; i++) {
+          this.lastTriggeredSchedules.delete(keys[i]);
+        }
+      }
+
+      this.logger.log(
+        `[Schedule Engine] ⏰ SCHEDULE TIME ARRIVED: "${schedule.label}" (${schedule.timeLocal}) for device ${schedule.deviceId}. Dispatching actuation command & event immediately!`,
+      );
+
+      const targetHardwareIds = getHardwareDeviceIds(schedule.deviceId);
+      const durationMs = schedule.durationMs || 15000;
+
+      // 1. Actuate the hardware servo immediately over MQTT
+      const cmdId = `sched_cmd_${Date.now()}`;
+      for (const hId of targetHardwareIds) {
+        this.mqttService.publishFeedCommand(hId, cmdId, durationMs);
+      }
+
+      // 2. Immediately record the feeding event in database & notify Telegram
+      await this.recordHardwareEvent({
+        deviceId: schedule.deviceId,
+        eventId: `sched_${Date.now()}`,
+        source: 'schedule',
+        status: 'completed',
+        durationMs,
+        actuationCompleted: true,
+      });
     }
   }
 
