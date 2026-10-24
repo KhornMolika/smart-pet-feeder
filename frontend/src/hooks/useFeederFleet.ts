@@ -6,6 +6,7 @@ import { INITIAL_DEVICES, DEMO_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/co
 
 import { getBackendApiUrl } from '@/lib/api-config';
 import { getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
+import { isSameDeviceId } from '@/lib/utils/device.util';
 
 const STORAGE_KEY_DEVICES = 'chinchum_fleet_devices';
 const STORAGE_KEY_ACTIVE_ID = 'chinchum_active_device_id';
@@ -276,7 +277,7 @@ export function useFeederFleet() {
       if (storedSchedules) {
         const parsed = JSON.parse(storedSchedules);
         if (Array.isArray(parsed)) {
-          const filtered = parsed.filter((s: { deviceId: string }) => s.deviceId !== deviceId);
+          const filtered = parsed.filter((s: { deviceId: string }) => !isSameDeviceId(s.deviceId, deviceId));
           localStorage.setItem('chinchum_schedules', JSON.stringify(filtered));
         }
       }

@@ -93,8 +93,7 @@ function ScheduleDashboard({
     setFeastMs(f);
   }, [activeDevice.id, activeDevice.todayMealsTarget, activeDevice.customPresets]);
 
-  const weeklyCounts = getWeeklyMealCounts(schedules);
-  const todayTarget = weeklyCounts[new Date().getDay()] || dailyMealsTarget;
+  const todayTarget = dailyMealsTarget;
 
   const handleUpdateTarget = (newTarget: number) => {
     triggerHaptic('medium');
@@ -102,13 +101,7 @@ function ScheduleDashboard({
     setDailyMealsTarget(clamped);
     onUpdateDeviceTarget(activeDevice.id, clamped);
 
-    const updatedSchedules = syncSchedulesToTarget(clamped);
-    if (context.updateDeviceNextScheduledFeedAt) {
-      const nextIso = getNextScheduledIso(updatedSchedules);
-      context.updateDeviceNextScheduledFeedAt(activeDevice.id, nextIso);
-    }
-
-    setToastMessage(`Daily goal set to ${clamped} meals/day • ${updatedSchedules.length} feeding alarms active!`);
+    setToastMessage(`Daily goal set to ${clamped} meals/day for ${activeDevice.petName}!`);
     setTargetSavedToast(true);
     setTimeout(() => setTargetSavedToast(false), 3000);
   };
@@ -166,11 +159,6 @@ function ScheduleDashboard({
   const handleToggleSchedule = (scheduleId: string) => {
     triggerHaptic('light');
     const updated = toggleSchedule(scheduleId);
-    const enabledCount = updated.filter((s) => s.enabled).length;
-    if (enabledCount > 0) {
-      setDailyMealsTarget(enabledCount);
-      onUpdateDeviceTarget(activeDevice.id, enabledCount);
-    }
     if (context.updateDeviceNextScheduledFeedAt) {
       const nextIso = getNextScheduledIso(updated);
       context.updateDeviceNextScheduledFeedAt(activeDevice.id, nextIso);
@@ -182,9 +170,6 @@ function ScheduleDashboard({
     triggerHaptic('heavy');
     const label = scheduleToDelete.label || 'Daily Meal';
     const remaining = deleteSchedule(scheduleToDelete.id);
-    const newCount = Math.max(1, remaining.length);
-    setDailyMealsTarget(newCount);
-    onUpdateDeviceTarget(activeDevice.id, newCount);
     if (context.updateDeviceNextScheduledFeedAt) {
       const nextIso = getNextScheduledIso(remaining);
       context.updateDeviceNextScheduledFeedAt(activeDevice.id, nextIso);
@@ -222,10 +207,6 @@ function ScheduleDashboard({
       updatedList = [...schedules, newSched];
       setToastMessage(`Added "${data.label}" schedule!`);
     }
-
-    const todayCount = updatedList.length;
-    setDailyMealsTarget(todayCount);
-    onUpdateDeviceTarget(activeDevice.id, todayCount);
 
     if (context.updateDeviceNextScheduledFeedAt) {
       const nextIso = getNextScheduledIso(updatedList);

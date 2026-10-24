@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { FeedingSchedule } from '@/types/feeder.types';
 import { INITIAL_SCHEDULES } from '@/lib/constants/feeder.constants';
+import { toHardwareDeviceId, isSameDeviceId } from '@/lib/utils/device.util';
+import { getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
+import { getBackendApiUrl } from '@/lib/api-config';
 
 const STORAGE_KEY_SCHEDULES = 'chinchum_schedules';
 
@@ -25,24 +28,24 @@ export const DEFAULT_MEAL_PRESETS: DefaultMealSlot[] = [
   { timeLocal: '23:00', label: 'Bedtime Snack', durationMs: 30000, daysOfWeek: [1, 2, 3, 4, 5, 6, 0], priority: 8 },
 ];
 
-import { getBackendApiUrl } from '@/lib/api-config';
-
 export function useDeviceSchedules(deviceId: string) {
   const backendUrl = getBackendApiUrl();
-  const [allSchedules, setAllSchedules] = useState<FeedingSchedule[]>(INITIAL_SCHEDULES);
 
-  // 1. Initial load from localStorage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_SCHEDULES);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setAllSchedules(parsed);
+  // 1. Initial lazy load from localStorage to guarantee immediate hydration without flash
+  const [allSchedules, setAllSchedules] = useState<FeedingSchedule[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_SCHEDULES);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed;
+          }
         }
-      }
-    } catch {}
-  }, []);
+      } catch {}
+    }
+    return INITIAL_SCHEDULES;
+  });
 
   const saveSchedules = useCallback((schedules: FeedingSchedule[]) => {
     setAllSchedules(schedules);
@@ -51,9 +54,7 @@ export function useDeviceSchedules(deviceId: string) {
     } catch {}
   }, []);
 
-  const targetDeviceId = (deviceId || 'feeder_esp32_01')
-    .replace(/-/g, '_')
-    .replace(/_001$/, '_01');
+  const targetDeviceId = toHardwareDeviceId(deviceId);
 
   // 2. Fetch authoritative schedules from NestJS backend API (which automatically syncs with MQTT)
   useEffect(() => {
@@ -61,16 +62,19 @@ export function useDeviceSchedules(deviceId: string) {
     async function loadBackendSchedules() {
       try {
         const res = await fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules`, {
-          headers: { 'x-bff-source': 'NextJS-AppRouter' },
+          headers: getTelegramAuthHeaders(),
         });
         if (res.ok) {
           const data = await res.json();
-          if (Array.isArray(data) && data.length > 0 && isSubscribed) {
+          if (Array.isArray(data) && isSubscribed) {
             setAllSchedules((prev) => {
-              const otherDevices = prev.filter((s) => s.deviceId !== deviceId);
-              const mapped: FeedingSchedule[] = data.map((item: any) => ({
+              // Retain schedules belonging to other devices
+              const otherDevices = prev.filter((s) => !isSameDeviceId(s.deviceId, deviceId));
+
+              // Map backend schedules, explicitly associating them with the active deviceId
+              const backendMapped: FeedingSchedule[] = data.map((item: any) => ({
                 id: item.id || `sched-${Date.now()}`,
-                deviceId: item.deviceId || deviceId,
+                deviceId: deviceId,
                 label: item.label,
                 timeLocal: item.timeLocal,
                 durationMs: item.durationMs,
@@ -78,7 +82,20 @@ export function useDeviceSchedules(deviceId: string) {
                 enabled: item.enabled ?? true,
                 priority: item.priority || 1,
               }));
-              const merged = [...otherDevices, ...mapped];
+
+              // Preserve any locally-created schedules that have temporary IDs and haven't synced yet
+              const existingDeviceScheds = prev.filter((s) => isSameDeviceId(s.deviceId, deviceId));
+              const pendingLocal = existingDeviceScheds.filter(
+                (loc) => loc.id.startsWith('sched-') && !backendMapped.some((b) => b.timeLocal === loc.timeLocal)
+              );
+
+              const mergedDeviceScheds = [...backendMapped, ...pendingLocal].sort((a, b) =>
+                a.timeLocal.localeCompare(b.timeLocal)
+              );
+
+              // If backend returned nothing or empty, but we already have local schedules, keep local
+              const finalForDevice = mergedDeviceScheds.length > 0 ? mergedDeviceScheds : existingDeviceScheds;
+              const merged = [...otherDevices, ...finalForDevice];
               saveSchedules(merged);
               return merged;
             });
@@ -92,11 +109,11 @@ export function useDeviceSchedules(deviceId: string) {
     return () => {
       isSubscribed = false;
     };
-  }, [deviceId, saveSchedules]);
+  }, [backendUrl, deviceId, saveSchedules, targetDeviceId]);
 
-  // Filter schedules for the current active device, sorted chronologically
+  // Filter schedules for the current active device using normalized ID comparison
   const deviceSchedules = allSchedules
-    .filter((s) => s.deviceId === deviceId)
+    .filter((s) => isSameDeviceId(s.deviceId, deviceId))
     .sort((a, b) => a.timeLocal.localeCompare(b.timeLocal));
 
   const addSchedule = (scheduleData: Omit<FeedingSchedule, 'id' | 'deviceId'>) => {
@@ -112,10 +129,7 @@ export function useDeviceSchedules(deviceId: string) {
     // Sync to backend (which automatically syncs to MQTT on ESP32)
     fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bff-source': 'NextJS-AppRouter',
-      },
+      headers: getTelegramAuthHeaders(),
       body: JSON.stringify({
         label: scheduleData.label,
         timeLocal: scheduleData.timeLocal,
@@ -157,14 +171,11 @@ export function useDeviceSchedules(deviceId: string) {
     // Sync state change to backend
     fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bff-source': 'NextJS-AppRouter',
-      },
+      headers: getTelegramAuthHeaders(),
       body: JSON.stringify({ enabled: newEnabled }),
     }).catch(() => {});
 
-    return updated.filter((s) => s.deviceId === deviceId);
+    return updated.filter((s) => isSameDeviceId(s.deviceId, deviceId));
   };
 
   const deleteSchedule = (scheduleId: string) => {
@@ -174,10 +185,10 @@ export function useDeviceSchedules(deviceId: string) {
     // Delete on backend
     fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'DELETE',
-      headers: { 'x-bff-source': 'NextJS-AppRouter' },
+      headers: getTelegramAuthHeaders(),
     }).catch(() => {});
 
-    return updated.filter((s) => s.deviceId === deviceId);
+    return updated.filter((s) => isSameDeviceId(s.deviceId, deviceId));
   };
 
   const updateSchedule = (scheduleId: string, updatedData: Partial<FeedingSchedule>) => {
@@ -189,14 +200,11 @@ export function useDeviceSchedules(deviceId: string) {
     // Update on backend
     fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bff-source': 'NextJS-AppRouter',
-      },
+      headers: getTelegramAuthHeaders(),
       body: JSON.stringify(updatedData),
     }).catch(() => {});
 
-    return updated.filter((s) => s.deviceId === deviceId);
+    return updated.filter((s) => isSameDeviceId(s.deviceId, deviceId));
   };
 
   /**
@@ -206,8 +214,8 @@ export function useDeviceSchedules(deviceId: string) {
   const syncSchedulesToTarget = useCallback(
     (targetCount: number): FeedingSchedule[] => {
       const clamped = Math.max(1, Math.min(10, targetCount));
-      const currentDeviceSchedules = allSchedules.filter((s) => s.deviceId === deviceId);
-      const otherDeviceSchedules = allSchedules.filter((s) => s.deviceId !== deviceId);
+      const currentDeviceSchedules = allSchedules.filter((s) => isSameDeviceId(s.deviceId, deviceId));
+      const otherDeviceSchedules = allSchedules.filter((s) => !isSameDeviceId(s.deviceId, deviceId));
 
       let updatedDeviceSchedules: FeedingSchedule[] = [];
 
@@ -215,15 +223,6 @@ export function useDeviceSchedules(deviceId: string) {
         // Count already matches; ensure all are enabled
         updatedDeviceSchedules = currentDeviceSchedules.map((s) => ({ ...s, enabled: true }));
       } else if (currentDeviceSchedules.length > clamped) {
-        // Need to remove excess schedules down to clamped count.
-        // Priority order to KEEP:
-        // Priority 1: Morning (06:00 - 09:30)
-        // Priority 2: Evening (17:30 - 20:30)
-        // Priority 3: Noon (11:30 - 13:30)
-        // Priority 4: Night (21:00 - 23:30)
-        // Priority 5: Afternoon (14:00 - 16:30)
-        // Priority 6: Mid-Morning (09:30 - 11:30)
-        // Priority 7: Others
         const getPriorityScore = (s: FeedingSchedule) => {
           const [h] = s.timeLocal.split(':').map((v) => parseInt(v, 10));
           if (h >= 6 && h <= 9) return 1; // Breakfast
@@ -241,7 +240,6 @@ export function useDeviceSchedules(deviceId: string) {
         const retained = ranked.slice(0, clamped).map((s) => ({ ...s, enabled: true }));
         updatedDeviceSchedules = retained.sort((a, b) => a.timeLocal.localeCompare(b.timeLocal));
       } else {
-        // Need to add new schedules to reach clamped count.
         const existing = currentDeviceSchedules.map((s) => ({ ...s, enabled: true }));
         const needed = clamped - existing.length;
 
@@ -273,7 +271,6 @@ export function useDeviceSchedules(deviceId: string) {
           }
         }
 
-        // Fallback generator if needed > available presets
         let fallbackHour = 9;
         while (added.length < needed) {
           const hourStr = String(fallbackHour).padStart(2, '0');
@@ -302,7 +299,7 @@ export function useDeviceSchedules(deviceId: string) {
       saveSchedules(newAllSchedules);
       return updatedDeviceSchedules;
     },
-    [allSchedules, deviceId]
+    [allSchedules, deviceId, saveSchedules]
   );
 
   /**
@@ -310,7 +307,7 @@ export function useDeviceSchedules(deviceId: string) {
    */
   const applyPresetRoutine = useCallback(
     (routineType: '2_everyday' | '3_everyday' | '4_everyday' | 'weekday_2_weekend_3'): FeedingSchedule[] => {
-      const otherDeviceSchedules = allSchedules.filter((s) => s.deviceId !== deviceId);
+      const otherDeviceSchedules = allSchedules.filter((s) => !isSameDeviceId(s.deviceId, deviceId));
       let newSchedules: FeedingSchedule[] = [];
 
       if (routineType === '2_everyday') {
@@ -343,7 +340,7 @@ export function useDeviceSchedules(deviceId: string) {
       saveSchedules(combined);
       return newSchedules;
     },
-    [allSchedules, deviceId]
+    [allSchedules, deviceId, saveSchedules]
   );
 
   return {

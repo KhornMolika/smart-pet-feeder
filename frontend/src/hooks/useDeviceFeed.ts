@@ -3,7 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { FeederDevice, FeedingEvent } from '@/types/feeder.types';
 import { playToneSound } from '@/lib/utils/audio.util';
-import { triggerHaptic, triggerNotificationHaptic, getStoredNotificationConfig } from '@/lib/utils/telegram.util';
+import {
+  triggerHaptic,
+  triggerNotificationHaptic,
+  getStoredNotificationConfig,
+  getTelegramAuthHeaders,
+} from '@/lib/utils/telegram.util';
 import { formatDuration } from '@/lib/utils/date.util';
 import { getBackendApiUrl } from '@/lib/api-config';
 
@@ -105,10 +110,7 @@ export function useDeviceFeed(
 
     fetch(`${getBackendApiUrl()}/api/v1/devices/${hardwareDeviceId}/stop`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bff-source': 'NextJS-AppRouter',
-      },
+      headers: getTelegramAuthHeaders(),
     }).catch((err) => {
       console.error('[Stop Feed] Network error sending stop command:', err);
     });

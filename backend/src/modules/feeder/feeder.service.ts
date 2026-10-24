@@ -251,7 +251,10 @@ export class FeederService implements OnModuleInit {
     deviceId: string,
     dto: CreateScheduleDto,
   ): Promise<FeedingSchedule> {
-    const targetId = 'feeder_esp32_01';
+    const targetId = (deviceId || 'feeder_esp32_01')
+      .replace(/^claim_/, '')
+      .replace(/-/g, '_')
+      .replace(/_001$/, '_01');
     const schedule = this.scheduleRepository.create({
       deviceId: targetId,
       ...dto,

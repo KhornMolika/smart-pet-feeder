@@ -5,6 +5,7 @@ import { FeederDevice, FeedingEvent, PortionPreset } from '@/types/feeder.types'
 import { useDeviceFeed } from '@/hooks/useDeviceFeed';
 import { DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
 import { formatRelativeTime, getCountdownUntil, getNextScheduledIso, getTodayMealsTarget } from '@/lib/utils/date.util';
+import { isSameDeviceId } from '@/lib/utils/device.util';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 import { useFeederContext } from '@/context/feeder-context';
 
@@ -59,12 +60,12 @@ function FeedDashboard({
       if (stored) {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed)) {
-          const deviceScheds = parsed.filter((s) => s.deviceId === activeDevice.id);
+          const deviceScheds = parsed.filter((s) => isSameDeviceId(s.deviceId, activeDevice.id));
           const computedNext = getNextScheduledIso(deviceScheds);
           if (computedNext) {
             nextFeedTargetIso = computedNext;
           }
-          targetForToday = getTodayMealsTarget(deviceScheds, targetForToday);
+          targetForToday = activeDevice.todayMealsTarget ?? getTodayMealsTarget(deviceScheds, targetForToday);
         }
       }
     } catch {}
