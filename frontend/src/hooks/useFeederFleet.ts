@@ -150,8 +150,21 @@ export function useFeederFleet() {
     }
 
     syncBackendDevices();
+    const interval = setInterval(() => {
+      if (isSubscribed) syncBackendDevices();
+    }, 4000);
+
+    const handleFocus = () => {
+      if (isSubscribed) syncBackendDevices();
+    };
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
     return () => {
       isSubscribed = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
     };
   }, []);
 

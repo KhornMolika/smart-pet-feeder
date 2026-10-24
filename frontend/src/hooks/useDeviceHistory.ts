@@ -91,8 +91,21 @@ export function useDeviceHistory() {
       }
     }
     loadBackendHistory();
+    const interval = setInterval(() => {
+      if (isSubscribed) loadBackendHistory();
+    }, 3000);
+
+    const handleFocus = () => {
+      if (isSubscribed) loadBackendHistory();
+    };
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
     return () => {
       isSubscribed = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
     };
   }, [saveHistory]);
 

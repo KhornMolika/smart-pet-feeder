@@ -127,8 +127,21 @@ export function useDeviceSchedules(deviceId: string) {
       }
     }
     loadBackendSchedules();
+    const interval = setInterval(() => {
+      if (isSubscribed) loadBackendSchedules();
+    }, 3000);
+
+    const handleFocus = () => {
+      if (isSubscribed) loadBackendSchedules();
+    };
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
     return () => {
       isSubscribed = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
     };
   }, [backendUrl, deviceId, saveSchedules, targetDeviceId]);
 
