@@ -20,12 +20,42 @@ export function useFeederFleet() {
       if (storedDevices) {
         const parsed = JSON.parse(storedDevices);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setDevices(parsed);
+          // Deduplicate fleet: Keep only 1 unique device per claimToken or normalized ID/petName
+          const seenKeys = new Set<string>();
+          const deduped: FeederDevice[] = [];
+
+          for (const d of parsed) {
+            // Priority 1: Hardware Claim Token
+            const tokenKey = d.claimToken
+              ? d.claimToken.replace(/^claim_/, '').toLowerCase()
+              : null;
+            // Priority 2: Device ID
+            const idKey = d.id ? d.id.toLowerCase() : null;
+            // Priority 3: Fallback combination of Pet Name + Room
+            const fallbackKey = `${(d.petName || 'mochi').toLowerCase().trim()}_${(d.room || 'living room').toLowerCase().trim()}`;
+
+            const primaryKey = tokenKey || idKey || fallbackKey;
+
+            if (seenKeys.has(primaryKey)) {
+              continue; // Prune redundant duplicate
+            }
+            seenKeys.add(primaryKey);
+            deduped.push(d);
+          }
+
+          const finalDevices = deduped.length > 0 ? deduped : parsed;
+          setDevices(finalDevices);
+
+          // If duplicates were pruned, update localStorage immediately to keep storage clean
+          if (finalDevices.length !== parsed.length) {
+            localStorage.setItem(STORAGE_KEY_DEVICES, JSON.stringify(finalDevices));
+          }
+
           const storedActiveId = localStorage.getItem(STORAGE_KEY_ACTIVE_ID);
-          if (storedActiveId && parsed.some((d: FeederDevice) => d.id === storedActiveId)) {
+          if (storedActiveId && finalDevices.some((d: FeederDevice) => d.id === storedActiveId)) {
             setActiveDeviceId(storedActiveId);
           } else {
-            setActiveDeviceId(parsed[0].id);
+            setActiveDeviceId(finalDevices[0].id);
           }
           return;
         }
@@ -73,11 +103,89 @@ export function useFeederFleet() {
     room: string;
     claimToken?: string;
   }) => {
-    const suffix = deviceData.claimToken
-      ? deviceData.claimToken.replace(/^claim_/, '').slice(0, 6)
-      : String(devices.length + 1).padStart(3, '0');
-    const newId = `feeder-esp32-${suffix}`;
+    // Generate deterministic canonical ID based on hardware/claim token
+    const rawToken = deviceData.claimToken?.replace(/^claim_/, '').trim() || '';
+    const cleanTokenSuffix = rawToken
+      ? rawToken.replace(/^feeder[-_]/, '').toLowerCase()
+      : '';
+    const newId = cleanTokenSuffix
+      ? `feeder-esp32-${cleanTokenSuffix}`
+      : `feeder-esp32-${String(devices.length + 1).padStart(3, '0')}`;
 
+    // Normalize matching keys to detect if this device is already in fleet
+    const normalizedClaimToken = deviceData.claimToken
+      ? deviceData.claimToken.replace(/^claim_/, '').toLowerCase()
+      : null;
+
+    // Check if this physical ESP32 or claim token is ALREADY in the user's fleet
+    const existingIndex = devices.findIndex((d) => {
+      // 1. Direct ID match
+      if (d.id === newId) return true;
+
+      // 2. Claim token match
+      if (normalizedClaimToken && d.claimToken) {
+        const dToken = d.claimToken.replace(/^claim_/, '').toLowerCase();
+        if (dToken === normalizedClaimToken) return true;
+      }
+
+      // 3. ID matches claim token or vice-versa
+      if (normalizedClaimToken && d.id.toLowerCase().includes(normalizedClaimToken)) {
+        return true;
+      }
+
+      // 4. Fallback: Same pet name and same room
+      if (
+        deviceData.petName &&
+        d.petName.toLowerCase().trim() === deviceData.petName.toLowerCase().trim() &&
+        d.room.toLowerCase().trim() === (deviceData.room || 'Living Room').toLowerCase().trim()
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (existingIndex >= 0) {
+      // Feeder already exists in fleet! Update existing device without adding redundant duplicate
+      const existing = devices[existingIndex];
+      const updatedDevice: FeederDevice = {
+        ...existing,
+        name: deviceData.name || existing.name,
+        petName: deviceData.petName || existing.petName,
+        petEmoji: deviceData.petEmoji || existing.petEmoji,
+        petIcon: deviceData.petEmoji || existing.petIcon,
+        room: deviceData.room || existing.room,
+        isOnline: true,
+        lastSeenAt: new Date().toISOString(),
+        claimToken: deviceData.claimToken || existing.claimToken,
+      };
+
+      const updated = [...devices];
+      updated[existingIndex] = updatedDevice;
+      saveDevices(updated);
+      switchDevice(existing.id);
+
+      // Call backend claim endpoint to ensure backend ownership sync
+      if (deviceData.claimToken) {
+        fetch(`${getBackendApiUrl()}/api/v1/devices/claim`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-bff-source': 'NextJS-AppRouter',
+          },
+          body: JSON.stringify({
+            claimToken: deviceData.claimToken,
+            petName: deviceData.petName,
+            petEmoji: deviceData.petEmoji,
+            room: deviceData.room,
+          }),
+        }).catch(() => {});
+      }
+
+      return updatedDevice;
+    }
+
+    // New unique hardware device
     const newDevice: FeederDevice = {
       id: newId,
       name: deviceData.name,

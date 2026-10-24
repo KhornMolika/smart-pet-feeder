@@ -69,7 +69,7 @@ const char* MQTT_PASS     = "";
 #define SERVO_CLOSED_ANGLE     0
 #define SERVO_OPEN_ANGLE       180
 #define MIN_DURATION_MS        200
-#define MAX_DURATION_MS        5000
+#define MAX_DURATION_MS        180000
 #define DEFAULT_DURATION_MS    1500
 #define COOLDOWN_MS            3000   // 3-second motor safety cooldown
 #define DEBOUNCE_DELAY_MS      50
@@ -164,21 +164,6 @@ void syncNtpTime() {
                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
   } else {
     Serial.println(F("[NTP] Time sync not available yet; DS3231 continues running."));
-  }
-}
-
-bool demoScheduleArmed = false;
-void armDemoSchedule(FeederDateTime dt) {
-  if (demoScheduleArmed || !dt.valid) return;
-  demoScheduleArmed = true;
-
-  uint8_t demoMin = (dt.minute + 1) % 60;
-  uint8_t demoHour = (dt.minute == 59) ? (dt.hour + 1) % 24 : dt.hour;
-
-  if (scheduleCount < MAX_SCHEDULES) {
-    schedules[scheduleCount] = { true, demoHour, demoMin, 1500, "Demo Test" };
-    scheduleCount++;
-    Serial.printf("[Schedule] Armed Live Demo Schedule at %02d:%02d (dispenses in <60s)!\n", demoHour, demoMin);
   }
 }
 
@@ -565,10 +550,10 @@ void setup() {
   Serial.println(F("[Servo] Gate secured closed. Servo motor asleep (0mA idle)."));
   Serial.flush();
 
-  // 5. Default Schedules
-  schedules[0] = { true, 7, 30, 700, "Breakfast" };
-  schedules[1] = { true, 18, 0, 700, "Dinner" };
-  scheduleCount = 2;
+  // 5. Feeding Schedules: Initialized with 0 schedules until configured via app
+  scheduleCount = 0;
+  Serial.println(F("[Schedule] Feeder starts with 0 schedules (awaiting config from app)."));
+  Serial.flush();
 
   // 6. Connect Wi-Fi with animated status, timeout & detailed diagnostics
   Serial.println(F("\n=================================================="));
@@ -606,6 +591,8 @@ void setup() {
     Serial.println(F("✅ [WiFi] Connected successfully!"));
     Serial.print(F("[WiFi] IP Address: "));
     Serial.println(WiFi.localIP());
+    Serial.print(F("[WiFi] Factory MAC Address: "));
+    Serial.println(WiFi.macAddress());
     Serial.printf("[WiFi] Signal Strength (RSSI): %d dBm\n", WiFi.RSSI());
 
     lcd.clear();
@@ -677,7 +664,6 @@ void loop() {
 
   // 2. Read Time & Execute Schedules
   FeederDateTime nowDt = rtcGetTime();
-  armDemoSchedule(nowDt);
   checkOfflineSchedules(nowDt);
 
   // 3. Tactile Push Button Handling (Debounced)

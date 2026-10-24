@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FeederDevice } from '@/types/feeder.types';
-import { ChevronDown, Check, Plus, Clock, MapPin, Radio, ChevronRight } from 'lucide-react';
+import { ChevronDown, Check, Plus, Clock, MapPin, Radio, ChevronRight, Trash2 } from 'lucide-react';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 import { PetIcon } from '@/components/common/pet-icon';
 
@@ -12,9 +12,16 @@ interface HeaderProps {
   activeDevice: FeederDevice | null;
   onSelectDevice: (deviceId: string) => void;
   onOpenAddDevice: () => void;
+  onRemoveDevice?: (deviceId: string) => void;
 }
 
-export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice }: HeaderProps) {
+export function Header({
+  devices,
+  activeDevice,
+  onSelectDevice,
+  onOpenAddDevice,
+  onRemoveDevice,
+}: HeaderProps) {
   const [showPicker, setShowPicker] = useState(false);
 
   // Close picker on Escape key
@@ -220,16 +227,38 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
                         </div>
                       </div>
 
-                      {/* Selection Checkmark / Action */}
-                      {isSelected ? (
-                        <div className="w-5 h-5 rounded-full bg-[#A7D1AE] text-[#143503] flex items-center justify-center shrink-0 shadow-xs ml-2">
-                          <Check size={11} strokeWidth={3} />
-                        </div>
-                      ) : (
-                        <div className="text-[10px] font-semibold text-[#4B633E]/50 group-hover:text-[#143503] group-hover:translate-x-0.5 transition-all pr-1 ml-2">
-                          Switch
-                        </div>
-                      )}
+                      {/* Selection Checkmark & Quick Remove Action */}
+                      <div className="flex items-center gap-1.5 ml-2 shrink-0">
+                        {onRemoveDevice && devices.length > 1 && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              triggerHaptic('medium');
+                              onRemoveDevice(dev.id);
+                            }}
+                            className={`p-1 rounded-md transition-colors cursor-pointer ${
+                              isSelected
+                                ? 'text-[#FFF2E6]/60 hover:text-rose-300 hover:bg-white/10'
+                                : 'text-[#4B633E]/40 hover:text-rose-600 hover:bg-rose-50'
+                            }`}
+                            title={`Remove ${dev.petName}'s feeder`}
+                          >
+                            <Trash2 size={12} />
+                          </span>
+                        )}
+
+                        {isSelected ? (
+                          <div className="w-5 h-5 rounded-full bg-[#A7D1AE] text-[#143503] flex items-center justify-center shrink-0 shadow-xs">
+                            <Check size={11} strokeWidth={3} />
+                          </div>
+                        ) : (
+                          <div className="text-[10px] font-semibold text-[#4B633E]/50 group-hover:text-[#143503] group-hover:translate-x-0.5 transition-all pr-1">
+                            Switch
+                          </div>
+                        )}
+                      </div>
                     </button>
                   );
                 })}

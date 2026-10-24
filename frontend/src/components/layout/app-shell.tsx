@@ -14,6 +14,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     activeDevice,
     switchDevice,
     addDevice,
+    removeDevice,
     isAddDeviceOpen,
     setIsAddDeviceOpen,
   } = useFeederContext();
@@ -86,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             setClaimToken(null);
             setIsAddDeviceOpen(true);
           }}
+          onRemoveDevice={removeDevice}
         />
 
         {/* Main Screen Content rendered by Next.js App Router */}

@@ -52,9 +52,6 @@ export class FeederService implements OnModuleInit {
   }
 
   onModuleInit() {
-    // Seed default schedules if none exist
-    this.seedDefaultSchedules('feeder_esp32_01');
-
     // Handle incoming MQTT events from ESP32
     this.mqttService.events.on('feedEvent', async (eventData) => {
       await this.recordHardwareEvent(eventData);
