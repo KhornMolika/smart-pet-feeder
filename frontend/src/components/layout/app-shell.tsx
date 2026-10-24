@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFeederContext } from '@/context/feeder-context';
 import { Header } from '@/components/common/header';
 import { BottomNav } from '@/components/common/bottom-nav';
@@ -19,6 +19,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   } = useFeederContext();
 
   const [claimToken, setClaimToken] = useState<string | null>(null);
+  const hasProcessedStartParam = useRef(false);
 
   // Expand Telegram WebApp to full height on mount if inside Telegram
   useEffect(() => {
@@ -35,8 +36,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Detect Telegram Deep Link (QR Claim or Family Member Join)
   useEffect(() => {
+    if (hasProcessedStartParam.current) return;
+
     const startParam = getTelegramStartParam();
     if (!startParam) return;
+
+    hasProcessedStartParam.current = true;
+
+    // Clean URL query params so closing or re-rendering never re-opens the modal
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
 
     if (startParam.startsWith('claim_') || startParam.startsWith('feeder_') || startParam.startsWith('feeder-')) {
       const formattedToken = startParam.startsWith('claim_') ? startParam : `claim_${startParam}`;
@@ -93,9 +103,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClose={() => {
             setIsAddDeviceOpen(false);
             setClaimToken(null);
+            hasProcessedStartParam.current = true;
+            if (typeof window !== 'undefined' && window.location.search) {
+              window.history.replaceState({}, '', window.location.pathname);
+            }
           }}
           claimToken={claimToken}
-          onAddDevice={(data) => addDevice(data)}
+          onAddDevice={(data) => {
+            addDevice(data);
+            hasProcessedStartParam.current = true;
+            if (typeof window !== 'undefined' && window.location.search) {
+              window.history.replaceState({}, '', window.location.pathname);
+            }
+          }}
         />
       </div>
     </div>

@@ -326,7 +326,7 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
               ) : (
                 <>
                   <Sparkles size={13} className="text-amber-300" />
-                  <span>{claimToken ? '✨ Claim Feeder' : '✨ Pair Feeder'}</span>
+                  <span>{claimToken ? 'Claim Feeder' : '✨ Pair Feeder'}</span>
                 </>
               )}
             </button>

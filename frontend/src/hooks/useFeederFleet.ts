@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FeederDevice, PortionPreset } from '@/types/feeder.types';
 import { INITIAL_DEVICES, DEMO_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
 
@@ -34,19 +34,19 @@ export function useFeederFleet() {
   }, []);
 
   // Save changes to localStorage
-  const saveDevices = (newDevices: FeederDevice[]) => {
+  const saveDevices = useCallback((newDevices: FeederDevice[]) => {
     setDevices(newDevices);
     try {
       localStorage.setItem(STORAGE_KEY_DEVICES, JSON.stringify(newDevices));
     } catch {}
-  };
+  }, []);
 
-  const switchDevice = (id: string) => {
+  const switchDevice = useCallback((id: string) => {
     setActiveDeviceId(id);
     try {
       localStorage.setItem(STORAGE_KEY_ACTIVE_ID, id);
     } catch {}
-  };
+  }, []);
 
   const loadDemoData = () => {
     saveDevices(DEMO_DEVICES);
