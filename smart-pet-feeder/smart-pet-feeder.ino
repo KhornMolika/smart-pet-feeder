@@ -689,7 +689,13 @@ void loop() {
 
   // 1. Maintain Wi-Fi, NTP Local Time Sync, and MQTT
   static unsigned long lastWifiRetry = 0;
+  static uint8_t wifiRetryCount = 0;
   if (WiFi.status() == WL_CONNECTED) {
+    if (wifiRetryCount > 0) {
+      Serial.println(F("✅ [WiFi] Reconnected successfully!"));
+      Serial.printf("[WiFi] IP Address: %s | RSSI: %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
+      wifiRetryCount = 0;
+    }
     if (!ntpSynced) {
       syncNtpTime();
     }
@@ -699,11 +705,35 @@ void loop() {
       mqttClient.loop();
     }
   } else {
-    // Attempt non-blocking Wi-Fi auto-reconnect every 25 seconds
-    if (now - lastWifiRetry >= 25000) {
+    // Attempt non-blocking Wi-Fi auto-reconnect every 20 seconds
+    if (now - lastWifiRetry >= 20000) {
       lastWifiRetry = now;
-      Serial.println(F("[WiFi] Background auto-reconnecting to Wi-Fi..."));
-      WiFi.disconnect();
+      wifiRetryCount++;
+      int status = WiFi.status();
+      Serial.printf("[WiFi] Background reconnect attempt #%d (status code: %d)...\n", wifiRetryCount, status);
+
+      // Periodically scan nearby networks to verify if hotspot SSID is visible in the air
+      if (wifiRetryCount % 3 == 0) {
+        Serial.printf("[WiFi] 🔍 Scanning nearby 2.4GHz Wi-Fi networks for '%s'...\n", WIFI_SSID);
+        int n = WiFi.scanNetworks(false, false);
+        bool found = false;
+        if (n <= 0) {
+          Serial.println(F("[WiFi] ⚠️ No 2.4GHz Wi-Fi networks detected in range. Check hotspot power/antenna."));
+        } else {
+          Serial.printf("[WiFi] Detected %d network(s) in air:\n", n);
+          for (int i = 0; i < n && i < 6; ++i) {
+            String foundSsid = WiFi.SSID(i);
+            Serial.printf("   - '%s' (%d dBm)\n", foundSsid.c_str(), WiFi.RSSI(i));
+            if (foundSsid.equalsIgnoreCase(WIFI_SSID)) {
+              found = true;
+            }
+          }
+          if (!found) {
+            Serial.printf("[WiFi] ⚠️ SSID '%s' not visible. Ensure phone hotspot is ON & set to 2.4GHz.\n", WIFI_SSID);
+          }
+        }
+      }
+
       WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
   }
