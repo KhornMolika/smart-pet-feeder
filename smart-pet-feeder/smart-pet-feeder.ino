@@ -26,6 +26,7 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <ArduinoJson.h>
+#include <RTClib.h>
 
 // ----------------------------------------------------------------------------
 // TIMEZONE & NTP CONFIGURATION (Cambodia / Indochina: UTC+7)
@@ -36,14 +37,11 @@
 // ----------------------------------------------------------------------------
 // PIN DEFINITIONS
 // ----------------------------------------------------------------------------
-#define PIN_SERVO         4   // SG90 Micro Servo PWM (GPIO 4; moved from GPIO 18 to avoid conflict with DS1302 CLK)
+#define PIN_SERVO         19   // SG90 Micro Servo PWM
 #define PIN_BUTTON        27  // Tactile Push Button (to GND, internal pullup)
 #define PIN_BUZZER        25  // Active Buzzer
 #define PIN_I2C_SDA       21  // 16x2 I2C LCD SDA
-#define PIN_I2C_SCL       22  // 16x2 I2C LCD SCL
-#define PIN_DS1302_DAT    19  // DS1302 RTC Data (DAT / IO)
-#define PIN_DS1302_CLK    18  // DS1302 RTC Clock (CLK / SCLK)
-#define PIN_DS1302_RST    5   // DS1302 RTC Reset / Chip Enable (RST / CE)
+#define PIN_I2C_SCL       22  // LCD and DS3231 share the I2C bus
 
 // ----------------------------------------------------------------------------
 // DEVICE & NETWORK CONFIGURATION (Defaults; overridable via build/config)
@@ -54,8 +52,8 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "moly";
-const char* WIFI_PASSWORD = "22224455";
+const char* WIFI_SSID     = "vivo X50";
+const char* WIFI_PASSWORD = "03062005";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
@@ -69,7 +67,7 @@ const char* MQTT_PASS     = "";
 // SAFETY LIMITS & TIMINGS
 // ----------------------------------------------------------------------------
 #define SERVO_CLOSED_ANGLE     0
-#define SERVO_OPEN_ANGLE       85
+#define SERVO_OPEN_ANGLE       180
 #define MIN_DURATION_MS        200
 #define MAX_DURATION_MS        5000
 #define DEFAULT_DURATION_MS    1500
@@ -127,8 +125,9 @@ FeedingSchedule schedules[MAX_SCHEDULES];
 uint8_t scheduleCount = 0;
 int lastTriggeredMinute = -1;
 
-// DS1302 Simple Software Interface
-struct DateTime {
+// Date/time container used by the feeder logic. The DS3231 library uses its own
+// DateTime class internally; this struct keeps the existing schedule/LCD code simple.
+struct FeederDateTime {
   uint16_t year;
   uint8_t month;
   uint8_t day;
@@ -138,201 +137,38 @@ struct DateTime {
   bool valid;
 };
 
+// DS3231 RTC (I2C, address 0x68)
+RTC_DS3231 rtc;
+bool rtcAvailable = false;
+
 // Timers
 unsigned long lastLcdUpdate = 0;
 unsigned long lastStateTelemetry = 0;
 
-// ----------------------------------------------------------------------------
-// DS1302 3-WIRE BIT-BANG PROTOCOL IMPLEMENTATION
-// ----------------------------------------------------------------------------
-uint8_t bcdToDec(uint8_t val) {
-  return ((val / 16 * 10) + (val % 16));
-}
-
-uint8_t decToBcd(uint8_t val) {
-  return ((val / 10 * 16) + (val % 10));
-}
-
-void ds1302WriteByte(uint8_t value) {
-  pinMode(PIN_DS1302_DAT, OUTPUT);
-  for (int i = 0; i < 8; i++) {
-    digitalWrite(PIN_DS1302_DAT, (value >> i) & 1);
-    digitalWrite(PIN_DS1302_CLK, HIGH);
-    delayMicroseconds(1);
-    digitalWrite(PIN_DS1302_CLK, LOW);
-    delayMicroseconds(1);
-  }
-}
-
-uint8_t ds1302ReadByte() {
-  pinMode(PIN_DS1302_DAT, INPUT);
-  uint8_t value = 0;
-  for (int i = 0; i < 8; i++) {
-    int bit = digitalRead(PIN_DS1302_DAT);
-    value |= (bit << i);
-    digitalWrite(PIN_DS1302_CLK, HIGH);
-    delayMicroseconds(1);
-    digitalWrite(PIN_DS1302_CLK, LOW);
-    delayMicroseconds(1);
-  }
-  return value;
-}
-
-void ds1302WriteRegister(uint8_t reg, uint8_t value) {
-  digitalWrite(PIN_DS1302_RST, HIGH);
-  delayMicroseconds(2);
-  ds1302WriteByte(reg);
-  ds1302WriteByte(value);
-  digitalWrite(PIN_DS1302_RST, LOW);
-  delayMicroseconds(2);
-}
-
-uint8_t ds1302ReadRegister(uint8_t reg) {
-  digitalWrite(PIN_DS1302_RST, HIGH);
-  delayMicroseconds(2);
-  ds1302WriteByte(reg);
-  uint8_t value = ds1302ReadByte();
-  digitalWrite(PIN_DS1302_RST, LOW);
-  delayMicroseconds(2);
-  return value;
-}
-
-void ds1302Init() {
-  pinMode(PIN_DS1302_RST, OUTPUT);
-  pinMode(PIN_DS1302_CLK, OUTPUT);
-  digitalWrite(PIN_DS1302_RST, LOW);
-  digitalWrite(PIN_DS1302_CLK, LOW);
-
-  // Disable write-protect (register 0x8E = 0x00)
-  ds1302WriteRegister(0x8E, 0x00);
-
-  // Clear clock halt bit on seconds register (0x80)
-  uint8_t sec = ds1302ReadRegister(0x81);
-  if (sec & 0x80) {
-    ds1302WriteRegister(0x80, sec & 0x7F);
-  }
-}
-
-DateTime ds1302GetTime() {
-  DateTime dt;
-  digitalWrite(PIN_DS1302_RST, HIGH);
-  delayMicroseconds(2);
-  ds1302WriteByte(0xBF); // Clock burst read command
-
-  uint8_t rawSec  = ds1302ReadByte();
-  uint8_t rawMin  = ds1302ReadByte();
-  uint8_t rawHour = ds1302ReadByte();
-  uint8_t rawDate = ds1302ReadByte();
-  uint8_t rawMon  = ds1302ReadByte();
-  /* uint8_t rawDay = */ ds1302ReadByte();
-  uint8_t rawYear = ds1302ReadByte();
-
-  digitalWrite(PIN_DS1302_RST, LOW);
-
-  dt.second = bcdToDec(rawSec & 0x7F);
-  dt.minute = bcdToDec(rawMin & 0x7F);
-  dt.hour   = bcdToDec(rawHour & 0x3F);
-  dt.day    = bcdToDec(rawDate & 0x3F);
-  dt.month  = bcdToDec(rawMon & 0x1F);
-  dt.year   = 2000 + bcdToDec(rawYear);
-
-  dt.valid = (dt.month >= 1 && dt.month <= 12 && dt.day >= 1 && dt.day <= 31 && dt.hour <= 23 && dt.minute <= 59);
-  return dt;
-}
-
-// ----------------------------------------------------------------------------
-// DS1307 I2C RTC (Native in Wokwi simulator & standard I2C RTC breakout)
-// ----------------------------------------------------------------------------
-#define DS1307_I2C_ADDR 0x68
-bool isDs1307Present = false;
-
-void ds1307Init() {
-  Wire.beginTransmission(DS1307_I2C_ADDR);
-  if (Wire.endTransmission() == 0) {
-    isDs1307Present = true;
-    Serial.println(F("[RTC] Detected DS1307 on I2C (Address 0x68)"));
-
-    // Check if oscillator is stopped (bit 7 of register 0x00 is CH bit)
-    Wire.beginTransmission(DS1307_I2C_ADDR);
-    Wire.write(0x00);
-    Wire.endTransmission();
-    Wire.requestFrom(DS1307_I2C_ADDR, 1);
-    if (Wire.available()) {
-      uint8_t sec = Wire.read();
-      if (sec & 0x80) { // Clock is halted -> clear CH bit to start oscillator
-        Wire.beginTransmission(DS1307_I2C_ADDR);
-        Wire.write(0x00);
-        Wire.write(sec & 0x7F);
-        Wire.endTransmission();
-      }
-    }
-  } else {
-    isDs1307Present = false;
-  }
-}
-
-DateTime ds1307GetTime() {
-  DateTime dt;
-  Wire.beginTransmission(DS1307_I2C_ADDR);
-  Wire.write(0x00);
-  if (Wire.endTransmission() != 0) {
-    dt.valid = false;
-    return dt;
-  }
-
-  if (Wire.requestFrom(DS1307_I2C_ADDR, 7) == 7) {
-    uint8_t rawSec  = Wire.read() & 0x7F;
-    uint8_t rawMin  = Wire.read() & 0x7F;
-    uint8_t rawHour = Wire.read() & 0x3F;
-    /* uint8_t rawDay = */ Wire.read();
-    uint8_t rawDate = Wire.read() & 0x3F;
-    uint8_t rawMon  = Wire.read() & 0x1F;
-    uint8_t rawYear = Wire.read();
-
-    dt.second = bcdToDec(rawSec);
-    dt.minute = bcdToDec(rawMin);
-    dt.hour   = bcdToDec(rawHour);
-    dt.day    = bcdToDec(rawDate);
-    dt.month  = bcdToDec(rawMon);
-    dt.year   = 2000 + bcdToDec(rawYear);
-    dt.valid  = (dt.month >= 1 && dt.month <= 12 && dt.day >= 1 && dt.day <= 31 && dt.hour <= 23 && dt.minute <= 59);
-  } else {
-    dt.valid = false;
-  }
-  return dt;
-}
-
-void ds1307SetTime(uint8_t hour, uint8_t min, uint8_t sec, uint8_t day, uint8_t month, uint16_t year) {
-  Wire.beginTransmission(DS1307_I2C_ADDR);
-  Wire.write(0x00);
-  Wire.write(decToBcd(sec & 0x7F)); // CH = 0 (oscillator running)
-  Wire.write(decToBcd(min));
-  Wire.write(decToBcd(hour));
-  Wire.write(1); // Day of week (1-7)
-  Wire.write(decToBcd(day));
-  Wire.write(decToBcd(month));
-  Wire.write(decToBcd(year % 100));
-  Wire.endTransmission();
-}
-
 bool ntpSynced = false;
 void syncNtpTime() {
-  if (WiFi.status() != WL_CONNECTED || ntpSynced) return;
+  if (WiFi.status() != WL_CONNECTED || ntpSynced || !rtcAvailable) return;
+
   configTime(TIMEZONE_OFFSET_SEC, 0, NTP_SERVER);
   struct tm timeinfo;
-  if (getLocalTime(&timeinfo, 1500)) {
+  if (getLocalTime(&timeinfo, 5000)) {
+    // Update the DS3231 from internet time. It will keep time when Wi-Fi is offline.
+    rtc.adjust(DateTime(timeinfo.tm_year + 1900,
+                        timeinfo.tm_mon + 1,
+                        timeinfo.tm_mday,
+                        timeinfo.tm_hour,
+                        timeinfo.tm_min,
+                        timeinfo.tm_sec));
     ntpSynced = true;
-    Serial.printf("[NTP] Synced Cambodia Local Time (UTC+7): %02d:%02d:%02d\n",
+    Serial.printf("[NTP] Synced Cambodia time (UTC+7): %02d:%02d:%02d\n",
                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    if (isDs1307Present) {
-      ds1307SetTime(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-                    timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900);
-    }
+  } else {
+    Serial.println(F("[NTP] Time sync not available yet; DS3231 continues running."));
   }
 }
 
 bool demoScheduleArmed = false;
-void armDemoSchedule(DateTime dt) {
+void armDemoSchedule(FeederDateTime dt) {
   if (demoScheduleArmed || !dt.valid) return;
   demoScheduleArmed = true;
 
@@ -347,42 +183,38 @@ void armDemoSchedule(DateTime dt) {
 }
 
 // ----------------------------------------------------------------------------
-// UNIFIED DUAL-RTC INTERFACE (Auto-switches between DS1307 and DS1302)
+// DS3231 RTC INTERFACE
 // ----------------------------------------------------------------------------
 void rtcInit() {
-  // 1. Try I2C DS1307 (Wokwi simulator or I2C module)
-  ds1307Init();
+  if (!rtc.begin()) {
+    rtcAvailable = false;
+    Serial.println(F("[RTC] DS3231 not found. Check SDA=21, SCL=22, VCC and GND."));
+    return;
+  }
 
-  // 2. Also initialize 3-wire DS1302 (Physical breadboard on GPIO 19, 18, 5)
-  ds1302Init();
+  rtcAvailable = true;
+  Serial.println(F("[RTC] DS3231 detected on I2C address 0x68."));
 
-  if (isDs1307Present) {
-    Serial.println(F("[RTC] Active RTC: DS1307 (I2C)"));
-  } else {
-    Serial.println(F("[RTC] Active RTC: DS1302 (3-Wire GPIO 19, 18, 5)"));
+  if (rtc.lostPower()) {
+    Serial.println(F("[RTC] Battery/time may have been lost. Waiting for NTP or compile-time fallback."));
+    // Temporary fallback; NTP will correct this after Wi-Fi connects.
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 }
 
-DateTime rtcGetTime() {
-  DateTime dt;
-  if (isDs1307Present) {
-    dt = ds1307GetTime();
-  } else {
-    dt = ds1302GetTime();
-  }
+FeederDateTime rtcGetTime() {
+  FeederDateTime dt = {};
+  if (!rtcAvailable) return dt;
 
-  // 3. Fallback: If neither physical chip is found, simulate internal clock starting at 07:29:45
-  if (!dt.valid) {
-    unsigned long totalSec = (millis() / 1000) + (7 * 3600 + 29 * 60 + 45);
-    dt.second = totalSec % 60;
-    dt.minute = (totalSec / 60) % 60;
-    dt.hour   = (totalSec / 3600) % 24;
-    dt.day    = 15;
-    dt.month  = 10;
-    dt.year   = 2026;
-    dt.valid  = true;
-  }
-
+  DateTime rtcNow = rtc.now();
+  dt.year = rtcNow.year();
+  dt.month = rtcNow.month();
+  dt.day = rtcNow.day();
+  dt.hour = rtcNow.hour();
+  dt.minute = rtcNow.minute();
+  dt.second = rtcNow.second();
+  dt.valid = rtcNow.isValid() && dt.month >= 1 && dt.month <= 12 &&
+             dt.day >= 1 && dt.day <= 31 && dt.hour <= 23 && dt.minute <= 59;
   return dt;
 }
 
@@ -502,7 +334,7 @@ void updateDispenseEngine() {
 // ----------------------------------------------------------------------------
 // SCHEDULE ENGINE (OFFLINE AUTONOMOUS)
 // ----------------------------------------------------------------------------
-void checkOfflineSchedules(DateTime dt) {
+void checkOfflineSchedules(FeederDateTime dt) {
   if (!dt.valid) return;
   if (currentState != STATE_IDLE) return;
 
@@ -587,7 +419,7 @@ void reconnectMqtt() {
   }
 }
 
-int getNextScheduleIndex(DateTime dt) {
+int getNextScheduleIndex(FeederDateTime dt) {
   if (scheduleCount == 0) return -1;
   int curTotalMin = dt.hour * 60 + dt.minute;
   int minDiff = 24 * 60 + 1;
@@ -609,7 +441,7 @@ int getNextScheduleIndex(DateTime dt) {
 // ----------------------------------------------------------------------------
 // LCD DISPLAY UPDATE
 // ----------------------------------------------------------------------------
-void updateLcd(DateTime dt) {
+void updateLcd(FeederDateTime dt) {
   if (currentState == STATE_DISPENSING) return; // Dispense UI has priority
 
   char line1[17];
@@ -663,7 +495,7 @@ void setup() {
   lcd.setCursor(0, 1);
   lcd.print("Initializing...");
 
-  // 3. Initialize RTC (Auto-detects DS1307 on I2C or DS1302 on 3-Wire)
+  // 3. Initialize DS3231 RTC on I2C
   rtcInit();
 
   // 4. Initialize Servo
@@ -779,7 +611,7 @@ void loop() {
   }
 
   // 2. Read Time & Execute Schedules
-  DateTime nowDt = rtcGetTime();
+  FeederDateTime nowDt = rtcGetTime();
   armDemoSchedule(nowDt);
   checkOfflineSchedules(nowDt);
 

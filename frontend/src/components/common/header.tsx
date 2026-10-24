@@ -41,11 +41,11 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
         <Image
           src="/images/logo.png"
           alt="ចិញ្ចឹម (ChinChem)"
-          width={45}
-          height={26}
+          width={30}
+          height={20}
           priority
           style={{ width: 'auto', height: 'auto' }}
-          className="h-6 sm:h-[26px] w-auto object-contain shrink-0 filter drop-shadow-[0_1px_2px_rgba(20,53,3,0.07)] transition-transform hover:scale-105"
+          className="h-5 sm:h-6 w-auto object-contain shrink-0 filter drop-shadow-[0_1px_2px_rgba(20,53,3,0.08)] transition-transform hover:scale-105"
         />
         <span className="text-xs font-black tracking-wider text-[#143503]/75 uppercase hidden xs:inline tracking-widest">
           ChinChem
@@ -62,11 +62,10 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
               triggerHaptic('light');
               setShowPicker(!showPicker);
             }}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border transition-all cursor-pointer text-left ${
-              showPicker
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border transition-all cursor-pointer text-left ${showPicker
                 ? 'border-[#143503] shadow-md ring-2 ring-[#143503]/15'
                 : 'border-[#143503]/15 shadow-xs hover:border-[#143503]/30 hover:shadow-sm'
-            }`}
+              }`}
           >
             {/* Pet Icon Avatar */}
             <div className="w-5 h-5 rounded-full bg-[#143503]/8 flex items-center justify-center shrink-0">
@@ -83,18 +82,16 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
 
             {/* Active Device Live Beacon */}
             <span
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                activeDevice.isOnline
+              className={`w-1.5 h-1.5 rounded-full shrink-0 ${activeDevice.isOnline
                   ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse'
                   : 'bg-amber-400'
-              }`}
+                }`}
             />
 
             <ChevronDown
               size={12}
-              className={`text-[#143503]/60 transition-transform duration-200 shrink-0 ${
-                showPicker ? 'rotate-180 text-[#143503]' : ''
-              }`}
+              className={`text-[#143503]/60 transition-transform duration-200 shrink-0 ${showPicker ? 'rotate-180 text-[#143503]' : ''
+                }`}
             />
           </button>
 
@@ -140,20 +137,18 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
                       key={dev.id}
                       type="button"
                       onClick={() => handleDeviceClick(dev.id)}
-                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer relative group ${
-                        isSelected
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all cursor-pointer relative group ${isSelected
                           ? 'bg-[#143503] text-[#FFF2E6] shadow-sm ring-1 ring-[#143503]'
                           : 'bg-white/70 hover:bg-white text-[#143503] border border-[#143503]/8 hover:border-[#143503]/20 hover:shadow-2xs active:scale-[0.99]'
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {/* Pet Species Avatar */}
                         <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
-                            isSelected
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${isSelected
                               ? 'bg-white/15 text-[#FFF2E6] border-white/15 shadow-2xs'
                               : 'bg-[#A7D1AE]/30 text-[#143503] border-[#143503]/10'
-                          }`}
+                            }`}
                         >
                           <PetIcon
                             icon={dev.petIcon || dev.petEmoji}
@@ -169,18 +164,16 @@ export function Header({ devices, activeDevice, onSelectDevice, onOpenAddDevice 
                               {dev.petName}
                             </span>
                             <span
-                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                                dev.isOnline
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${dev.isOnline
                                   ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]'
                                   : 'bg-amber-400'
-                              }`}
+                                }`}
                               title={dev.isOnline ? 'Online' : 'Offline'}
                             />
                           </div>
                           <div
-                            className={`text-[10px] font-medium flex items-center gap-1.5 truncate mt-0.5 ${
-                              isSelected ? 'text-[#FFF2E6]/75' : 'text-[#4B633E]'
-                            }`}
+                            className={`text-[10px] font-medium flex items-center gap-1.5 truncate mt-0.5 ${isSelected ? 'text-[#FFF2E6]/75' : 'text-[#4B633E]'
+                              }`}
                           >
                             <span className="flex items-center gap-0.5">
                               <MapPin size={9} className="shrink-0 opacity-70" />
