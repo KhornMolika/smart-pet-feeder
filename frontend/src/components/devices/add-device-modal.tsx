@@ -53,10 +53,10 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
     }
   }, [isOpen]);
 
-  // Reset form when modal opens
+  // Reset and pre-fill form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setPetName('');
+      setPetName('Mochi');
       setPetEmoji('cat');
       setRoom('Living Room');
       setHardwareId(claimToken ? claimToken.replace(/^claim_/, '') : 'feeder_esp32_01');
@@ -68,7 +68,7 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!petName.trim()) return;
+    const finalPetName = petName.trim() || 'Mochi';
 
     triggerHaptic('medium');
     setIsPairingSuccess(true);
@@ -83,8 +83,8 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
 
     setTimeout(() => {
       onAddDevice({
-        name: `${petName.trim()}'s Feeder Pro`,
-        petName: petName.trim(),
+        name: `${finalPetName}'s Feeder Pro`,
+        petName: finalPetName,
         petEmoji,
         room: room.trim() || 'Living Room',
         claimToken: finalToken,
@@ -155,13 +155,31 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
         <form onSubmit={handleSubmit} className="flex flex-col gap-2 relative z-10">
           {/* A. Pet Name Input */}
           <div className="flex flex-col gap-0.5">
-            <label className="text-[11px] font-bold text-[#143503] flex items-center justify-between">
-              <span>Pet Name</span>
-              <span className="text-[10px] text-[#4B633E]/70 font-normal">Required</span>
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-[#143503]">Pet Name</label>
+              {/* Quick Pet Name Chips */}
+              <div className="flex items-center gap-1">
+                {['Mochi', 'Luna', 'Max', 'Coco'].map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic('selection');
+                      setPetName(name);
+                    }}
+                    className={`px-1.5 py-0.2 rounded text-[8.5px] font-semibold transition-all cursor-pointer ${
+                      petName === name
+                        ? 'bg-[#143503] text-[#FFF2E6]'
+                        : 'bg-white/70 hover:bg-white text-[#4B633E] border border-[#143503]/10'
+                    }`}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <input
               type="text"
-              required
               value={petName}
               onChange={(e) => setPetName(e.target.value)}
               placeholder="e.g. Mochi, Luna, Bella, Max..."
@@ -293,22 +311,22 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
 
             <button
               type="submit"
-              disabled={!petName.trim() || isPairingSuccess}
-              className={`w-full py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm active:scale-95 ${
-                petName.trim() && !isPairingSuccess
-                  ? 'bg-[#143503] hover:bg-[#143503]/90 text-[#FFF2E6]'
-                  : 'bg-[#143503]/30 text-[#FFF2E6]/60 cursor-not-allowed'
+              disabled={isPairingSuccess}
+              className={`w-full py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md active:scale-95 ${
+                !isPairingSuccess
+                  ? 'bg-[#143503] hover:bg-[#143503]/90 text-[#FFF2E6] shadow-emerald-950/20 ring-1 ring-[#143503]/20'
+                  : 'bg-[#143503]/50 text-[#FFF2E6]/80 cursor-wait'
               }`}
             >
               {isPairingSuccess ? (
                 <>
-                  <CheckCircle2 size={13} className="text-emerald-400" />
+                  <CheckCircle2 size={13} className="text-emerald-400 animate-pulse" />
                   <span>{claimToken ? 'Claimed!' : 'Paired!'}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles size={13} />
-                  <span>{claimToken ? 'Claim Feeder' : 'Pair Feeder'}</span>
+                  <Sparkles size={13} className="text-amber-300" />
+                  <span>{claimToken ? '✨ Claim Feeder' : '✨ Pair Feeder'}</span>
                 </>
               )}
             </button>
