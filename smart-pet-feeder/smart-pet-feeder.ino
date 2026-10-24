@@ -52,7 +52,7 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "moly";
+const char* WIFI_SSID     = "Moly";
 const char* WIFI_PASSWORD = "22224455";
 
 // MQTT Broker Credentials
@@ -670,7 +670,8 @@ void loop() {
     if (now - lastWifiRetry >= 25000) {
       lastWifiRetry = now;
       Serial.println(F("[WiFi] Background auto-reconnecting to Wi-Fi..."));
-      WiFi.reconnect();
+      WiFi.disconnect();
+      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     }
   }
 
