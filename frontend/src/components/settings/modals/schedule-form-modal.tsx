@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { DAYS_OF_WEEK } from '@/lib/constants/feeder.constants';
-import { formatDuration } from '@/lib/utils/date.util';
+import { formatTime, formatDuration } from '@/lib/utils/date.util';
 import { PresetIcon } from '@/components/common/pet-icon';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
 import { Clock, X, Sparkles } from 'lucide-react';
@@ -65,9 +65,9 @@ export function ScheduleFormModal({
       setDurationMs(dur);
       setSelectedDays(editingSchedule.daysOfWeek);
     } else {
-      setTime('12:30');
-      setLabel('Noon Snack');
-      setDurationMs(snackMs);
+      setTime('08:00');
+      setLabel('Morning Breakfast');
+      setDurationMs(bowlMs);
       setSelectedDays([1, 2, 3, 4, 5, 6, 0]);
     }
   }, [isOpen, editingSchedule, snackMs, bowlMs, feastMs]);
@@ -99,9 +99,16 @@ export function ScheduleFormModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic('heavy');
+
+    // Ensure 2-digit hour padding (e.g. "5:30" -> "05:30")
+    let normalizedTime = time.trim();
+    if (/^\d:[0-5]\d$/.test(normalizedTime)) {
+      normalizedTime = `0${normalizedTime}`;
+    }
+
     onSaveSchedule({
       id: editingSchedule ? editingSchedule.id : undefined,
-      timeLocal: time,
+      timeLocal: normalizedTime,
       daysOfWeek: selectedDays,
       durationMs,
       label,
@@ -138,7 +145,12 @@ export function ScheduleFormModal({
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[11px] font-bold text-[#143503] block mb-1">Time (Local 24h)</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-[#143503]">Time</label>
+                <span className="text-[10px] font-mono font-bold text-[#143503] bg-[#143503]/8 px-1.5 py-0.5 rounded">
+                  {formatTime(time)}
+                </span>
+              </div>
               <input
                 type="time"
                 required
@@ -146,6 +158,9 @@ export function ScheduleFormModal({
                 onChange={(e) => setTime(e.target.value)}
                 className="w-full p-2 rounded-xl border border-[#143503]/20 bg-[#FFF2E6]/50 text-xs font-mono font-bold text-[#143503] focus:outline-[#143503]"
               />
+              <span className="text-[10px] text-[#4B633E] font-medium mt-1 block">
+                Alarm: <strong className="text-[#143503]">{formatTime(time)}</strong>
+              </span>
             </div>
 
             <div>
@@ -166,24 +181,23 @@ export function ScheduleFormModal({
                     setDurationMs(bowlMs);
                   }
                 }}
-                placeholder="e.g. Afternoon Lunch"
+                placeholder="e.g. Morning Breakfast"
                 className="w-full p-2 rounded-xl border border-[#143503]/20 bg-[#FFF2E6]/50 text-xs font-bold text-[#143503] focus:outline-[#143503]"
               />
-              {/* Quick Suggest Meal Presets */}
+              {/* Quick Suggest Meal Presets (Names only - preserves user's chosen time) */}
               <div className="flex items-center gap-1 flex-wrap pt-1.5">
                 <span className="text-[10px] text-[#4B633E] font-medium">Quick:</span>
                 {[
-                  { label: 'Morning Breakfast', time: '07:30', duration: bowlMs },
-                  { label: 'Noon Snack', time: '12:30', duration: snackMs },
-                  { label: 'Evening Dinner', time: '18:30', duration: bowlMs },
-                  { label: 'Night Supper', time: '21:30', duration: snackMs },
+                  { label: 'Morning Breakfast', duration: bowlMs },
+                  { label: 'Noon Snack', duration: snackMs },
+                  { label: 'Evening Dinner', duration: bowlMs },
+                  { label: 'Night Supper', duration: snackMs },
                 ].map((preset) => (
                   <button
                     key={preset.label}
                     type="button"
                     onClick={() => {
                       setLabel(preset.label);
-                      setTime(preset.time);
                       setDurationMs(preset.duration);
                     }}
                     className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer ${
