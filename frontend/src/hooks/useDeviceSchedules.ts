@@ -28,6 +28,25 @@ export const DEFAULT_MEAL_PRESETS: DefaultMealSlot[] = [
   { timeLocal: '23:00', label: 'Bedtime Snack', durationMs: 30000, daysOfWeek: [1, 2, 3, 4, 5, 6, 0], priority: 8 },
 ];
 
+export function deduplicateSchedules(schedules: FeedingSchedule[]): FeedingSchedule[] {
+  const seenIds = new Set<string>();
+  const seenTimeLabel = new Set<string>();
+  const result: FeedingSchedule[] = [];
+
+  for (const s of schedules) {
+    if (!s || !s.timeLocal) continue;
+    const timeLabelKey = `${s.timeLocal}_${(s.label || '').trim().toLowerCase()}`;
+    if (seenIds.has(s.id) || seenTimeLabel.has(timeLabelKey)) {
+      continue;
+    }
+    seenIds.add(s.id);
+    seenTimeLabel.add(timeLabelKey);
+    result.push(s);
+  }
+
+  return result.sort((a, b) => a.timeLocal.localeCompare(b.timeLocal));
+}
+
 export function useDeviceSchedules(deviceId: string) {
   const backendUrl = getBackendApiUrl();
 
@@ -39,7 +58,7 @@ export function useDeviceSchedules(deviceId: string) {
         if (stored) {
           const parsed = JSON.parse(stored);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed;
+            return deduplicateSchedules(parsed);
           }
         }
       } catch {}
@@ -48,9 +67,10 @@ export function useDeviceSchedules(deviceId: string) {
   });
 
   const saveSchedules = useCallback((schedules: FeedingSchedule[]) => {
-    setAllSchedules(schedules);
+    const deduped = deduplicateSchedules(schedules);
+    setAllSchedules(deduped);
     try {
-      localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(schedules));
+      localStorage.setItem(STORAGE_KEY_SCHEDULES, JSON.stringify(deduped));
     } catch {}
   }, []);
 
@@ -71,7 +91,7 @@ export function useDeviceSchedules(deviceId: string) {
               // Retain schedules belonging to other devices
               const otherDevices = prev.filter((s) => !isSameDeviceId(s.deviceId, deviceId));
 
-              // Map backend schedules, explicitly associating them with the active deviceId
+              // Map backend authoritative schedules
               const backendMapped: FeedingSchedule[] = data.map((item: any) => ({
                 id: item.id || `sched-${Date.now()}`,
                 deviceId: deviceId,
@@ -83,19 +103,20 @@ export function useDeviceSchedules(deviceId: string) {
                 priority: item.priority || 1,
               }));
 
-              // Preserve any locally-created schedules that have temporary IDs and haven't synced yet
+              // Preserve ONLY very fresh in-flight local additions (< 15 seconds) that haven't hit backend yet
+              const now = Date.now();
               const existingDeviceScheds = prev.filter((s) => isSameDeviceId(s.deviceId, deviceId));
-              const pendingLocal = existingDeviceScheds.filter(
-                (loc) => loc.id.startsWith('sched-') && !backendMapped.some((b) => b.timeLocal === loc.timeLocal)
-              );
+              const freshInFlight = existingDeviceScheds.filter((loc) => {
+                if (!loc.id.startsWith('sched-')) return false;
+                const parts = loc.id.split('-');
+                const ts = Number(parts[1]);
+                const isFresh = Number.isFinite(ts) && now - ts < 15000;
+                return isFresh && !backendMapped.some((b) => b.timeLocal === loc.timeLocal);
+              });
 
-              const mergedDeviceScheds = [...backendMapped, ...pendingLocal].sort((a, b) =>
-                a.timeLocal.localeCompare(b.timeLocal)
-              );
-
-              // If backend returned nothing or empty, but we already have local schedules, keep local
-              const finalForDevice = mergedDeviceScheds.length > 0 ? mergedDeviceScheds : existingDeviceScheds;
-              const merged = [...otherDevices, ...finalForDevice];
+              // Combine backend authoritative schedules with in-flight items, and deduplicate
+              const combinedDevice = deduplicateSchedules([...backendMapped, ...freshInFlight]);
+              const merged = [...otherDevices, ...combinedDevice];
               saveSchedules(merged);
               return merged;
             });
@@ -123,7 +144,7 @@ export function useDeviceSchedules(deviceId: string) {
       id: tempId,
       deviceId,
     };
-    const updated = [...allSchedules, newSchedule];
+    const updated = deduplicateSchedules([...allSchedules, newSchedule]);
     saveSchedules(updated);
 
     // Sync to backend (which automatically syncs to MQTT on ESP32)
@@ -144,8 +165,9 @@ export function useDeviceSchedules(deviceId: string) {
           if (saved && saved.id) {
             setAllSchedules((prev) => {
               const mapped = prev.map((s) => (s.id === tempId ? { ...s, id: saved.id } : s));
-              saveSchedules(mapped);
-              return mapped;
+              const deduped = deduplicateSchedules(mapped);
+              saveSchedules(deduped);
+              return deduped;
             });
           }
         } else {
