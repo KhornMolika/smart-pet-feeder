@@ -98,8 +98,8 @@ function ScheduleDashboard({
         ? `🌴 Pet Away Mode activated • Feeding paused for ${activeDevice.petName}`
         : `🏠 Welcome back! Feeding schedules resumed for ${activeDevice.petName}`
     );
-    setTargetSavedToast(true);
-    setTimeout(() => setTargetSavedToast(false), 3500);
+    setFeedbackToast(true);
+    setTimeout(() => setFeedbackToast(false), 3500);
   };
 
   const handleSavePresets = () => {
@@ -159,8 +159,8 @@ function ScheduleDashboard({
     }
     setToastMessage(`Deleted "${label}" feeding schedule`);
     setScheduleToDelete(null);
-    setTargetSavedToast(true);
-    setTimeout(() => setTargetSavedToast(false), 3000);
+    setFeedbackToast(true);
+    setTimeout(() => setFeedbackToast(false), 3000);
   };
 
   const handleSaveSchedule = (data: {
