@@ -199,6 +199,33 @@ export class FeederService implements OnModuleInit {
     });
   }
 
+  /**
+   * Immediately stops active food dispensing on the ESP32 hardware and closes the servo gate.
+   */
+  async stopFeed(deviceId: string, requestedBy: string = 'bff_owner') {
+    this.logger.log(
+      `[FeederService] 🛑 Stop feed command for ${deviceId} (Requested by: ${requestedBy})`,
+    );
+
+    this.mqttService.publishStopCommand(deviceId);
+
+    // Publish to normalized hardware ID if different (e.g. feeder-esp32-01 -> feeder_esp32_01)
+    const normalizedHardwareId = deviceId
+      .replace(/^feeder-/, 'feeder_')
+      .replace(/_001$/, '_01');
+    if (normalizedHardwareId !== deviceId) {
+      this.mqttService.publishStopCommand(normalizedHardwareId);
+    }
+
+    return {
+      success: true,
+      deviceId,
+      stopped: true,
+      message: 'Dispense stopped immediately. Gate closed.',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
   // --------------------------------------------------------------------------
   // SCHEDULES
   // --------------------------------------------------------------------------

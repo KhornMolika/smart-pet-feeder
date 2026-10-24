@@ -78,16 +78,16 @@ function ScheduleDashboard({
 
   // Portion Presets state
   const currentPresets = activeDevice.customPresets || [];
-  const [snackMs, setSnackMs] = useState(currentPresets.find((p) => p.id === 'snack')?.durationMs ?? 30000);
-  const [bowlMs, setBowlMs] = useState(currentPresets.find((p) => p.id === 'bowl')?.durationMs ?? 60000);
-  const [feastMs, setFeastMs] = useState(currentPresets.find((p) => p.id === 'feast')?.durationMs ?? 180000);
+  const [snackMs, setSnackMs] = useState(currentPresets.find((p) => p.id === 'snack')?.durationMs ?? 15000);
+  const [bowlMs, setBowlMs] = useState(currentPresets.find((p) => p.id === 'bowl')?.durationMs ?? 30000);
+  const [feastMs, setFeastMs] = useState(currentPresets.find((p) => p.id === 'feast')?.durationMs ?? 45000);
   const [presetsSavedToast, setPresetsSavedToast] = useState(false);
 
   useEffect(() => {
     setDailyMealsTarget(activeDevice.todayMealsTarget ?? 3);
-    const s = activeDevice.customPresets?.find((p) => p.id === 'snack')?.durationMs ?? 30000;
-    const b = activeDevice.customPresets?.find((p) => p.id === 'bowl')?.durationMs ?? 60000;
-    const f = activeDevice.customPresets?.find((p) => p.id === 'feast')?.durationMs ?? 180000;
+    const s = activeDevice.customPresets?.find((p) => p.id === 'snack')?.durationMs ?? 15000;
+    const b = activeDevice.customPresets?.find((p) => p.id === 'bowl')?.durationMs ?? 30000;
+    const f = activeDevice.customPresets?.find((p) => p.id === 'feast')?.durationMs ?? 45000;
     setSnackMs(s);
     setBowlMs(b);
     setFeastMs(f);

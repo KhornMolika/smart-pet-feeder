@@ -52,8 +52,8 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "Moly";
-const char* WIFI_PASSWORD = "22224455";
+const char* WIFI_SSID     = "Oudon";
+const char* WIFI_PASSWORD = "015618134";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
@@ -70,7 +70,7 @@ const char* MQTT_PASS     = "";
 #define SERVO_OPEN_ANGLE       90     // Gate open 90° for full gravity drop without stalling
 #define MIN_DURATION_MS        200
 #define MAX_DURATION_MS        180000
-#define DEFAULT_DURATION_MS    30000  // 30s standard portion, matches webapp default Light Snack
+#define DEFAULT_DURATION_MS    15000  // 15s standard portion, matches webapp presets (15s / 30s / 45s)
 #define COOLDOWN_MS            3000   // 3-second motor safety cooldown
 #define DEBOUNCE_DELAY_MS      50
 #define MAX_SCHEDULES          8
@@ -349,6 +349,32 @@ void publishFeedEvent(bool completed) {
   Serial.printf("[MQTT] Event publish result: %s\n", pubOk ? "SUCCESS ✅" : "FAILED ❌");
 }
 
+void stopDispense(const char* reason = "manual_stop") {
+  if (currentState != STATE_DISPENSING) {
+    Serial.printf("[Feeder] ⚠️ Stop requested, but feeder is not dispensing (state: %d)\n", currentState);
+    return;
+  }
+
+  Serial.println(F("\n=================================================="));
+  Serial.printf("[Feeder] 🛑 DISPENSE STOPPED! Gate closing immediately...\n");
+  Serial.printf("  Reason:   %s\n", reason);
+  Serial.printf("  Elapsed:  %lu ms of %u ms\n", millis() - dispenseStartTime, activeDurationMs);
+  Serial.printf("==================================================\n");
+
+  closeGate();
+  buzzerChirpComplete();
+  lastDispenseEndTime = millis();
+  currentState = STATE_COOLDOWN;
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("FEEDING STOPPED!");
+  lcd.setCursor(0, 1);
+  lcd.print("Gate Closed.");
+
+  publishFeedEvent(false);
+}
+
 void updateDispenseEngine() {
   unsigned long now = millis();
 
@@ -406,17 +432,32 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   Serial.printf("==================================================\n");
 
   char feedCmdTopic[64];
+  char stopCmdTopic[64];
   char configTopic[64];
   char syncCmdTopic[64];
   snprintf(feedCmdTopic, sizeof(feedCmdTopic), "feeders/%s/cmd/feed", deviceId);
+  snprintf(stopCmdTopic, sizeof(stopCmdTopic), "feeders/%s/cmd/stop", deviceId);
   snprintf(configTopic, sizeof(configTopic), "feeders/%s/config/desired", deviceId);
   snprintf(syncCmdTopic, sizeof(syncCmdTopic), "feeders/%s/cmd/sync", deviceId);
 
-  // 1. Remote Manual Feed Command (Triggered from Telegram Mini App / WebApp)
+  // 1. Remote Stop Command (Triggered from WebApp / Telegram)
+  if (strcmp(topic, stopCmdTopic) == 0) {
+    Serial.println(F("[MQTT IN] 🛑 Received STOP command from cloud"));
+    stopDispense("app_stop");
+    return;
+  }
+
+  // 2. Remote Manual Feed Command (Triggered from Telegram Mini App / WebApp)
   if (strcmp(topic, feedCmdTopic) == 0) {
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, message);
     if (!error) {
+      const char* action = doc["action"] | "";
+      if (strcmp(action, "stop") == 0) {
+        Serial.println(F("[MQTT IN] 🛑 Received STOP action in feed cmd"));
+        stopDispense("app_stop");
+        return;
+      }
       const char* cmdId = doc["commandId"] | "";
       uint16_t duration = doc["durationMs"] | DEFAULT_DURATION_MS;
       Serial.printf("[MQTT IN] ✅ Feed command parsed: %d ms, cmdId: '%s'\n", duration, cmdId);
@@ -468,13 +509,16 @@ void reconnectMqtt() {
     mqttClient.publish(availabilityTopic, "online", true);
 
     char feedCmdTopic[64];
+    char stopCmdTopic[64];
     char configTopic[64];
     snprintf(feedCmdTopic, sizeof(feedCmdTopic), "feeders/%s/cmd/feed", deviceId);
+    snprintf(stopCmdTopic, sizeof(stopCmdTopic), "feeders/%s/cmd/stop", deviceId);
     snprintf(configTopic, sizeof(configTopic), "feeders/%s/config/desired", deviceId);
 
     mqttClient.subscribe(feedCmdTopic, 1);
+    mqttClient.subscribe(stopCmdTopic, 1);
     mqttClient.subscribe(configTopic, 1);
-    Serial.printf("[MQTT] Subscribed to:\n  -> %s\n  -> %s\n", feedCmdTopic, configTopic);
+    Serial.printf("[MQTT] Subscribed to:\n  -> %s\n  -> %s\n  -> %s\n", feedCmdTopic, stopCmdTopic, configTopic);
   } else {
     Serial.printf("[MQTT] ❌ Connect failed, rc=%d (Will retry in 5s)\n", mqttClient.state());
   }
@@ -751,7 +795,12 @@ void loop() {
     if (reading != buttonState) {
       buttonState = reading;
       if (buttonState == LOW) { // Button pressed (active-low)
-        startDispense(DEFAULT_DURATION_MS, "button", "");
+        if (currentState == STATE_DISPENSING) {
+          // Emergency Stop: Clicking button while dispensing immediately closes gate!
+          stopDispense("button_stop");
+        } else {
+          startDispense(DEFAULT_DURATION_MS, "button", "");
+        }
       }
     }
   }

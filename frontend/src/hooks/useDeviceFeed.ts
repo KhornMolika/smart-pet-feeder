@@ -11,7 +11,7 @@ export function useDeviceFeed(
   activeDevice: FeederDevice,
   onFeedSuccess?: (event: FeedingEvent) => void
 ) {
-  const [selectedDurationMs, setSelectedDurationMs] = useState<number>(60000);
+  const [selectedDurationMs, setSelectedDurationMs] = useState<number>(30000);
   const [isDispensing, setIsDispensing] = useState<boolean>(false);
   const [actuationRemainingMs, setActuationRemainingMs] = useState<number>(0);
   const [cooldownRemaining, setCooldownRemaining] = useState<number>(0);
@@ -86,6 +86,40 @@ export function useDeviceFeed(
     }, 4500);
   }, [activeDevice, onFeedSuccess, startCooldown]);
 
+  const stopDispense = useCallback(async () => {
+    if (!isDispensing) return;
+
+    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    triggerHaptic('heavy');
+
+    setIsDispensing(false);
+    setFeedStatus('idle');
+    setActuationRemainingMs(0);
+
+    const hardwareDeviceId = activeDevice.claimToken
+      ? activeDevice.claimToken.replace(/^claim_/, '')
+      : activeDevice.id.replace(/^feeder-/, 'feeder_').replace(/-([a-zA-Z0-9]+)$/, '_$1');
+
+    console.log(`[Stop Feed] Sending stop command to hardware: ${hardwareDeviceId}`);
+
+    fetch(`${getBackendApiUrl()}/api/v1/devices/${hardwareDeviceId}/stop`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-bff-source': 'NextJS-AppRouter',
+      },
+    }).catch((err) => {
+      console.error('[Stop Feed] Network error sending stop command:', err);
+    });
+
+    setNotificationToast('Dispense stopped! Gate closed.');
+    startCooldown(3);
+
+    setTimeout(() => {
+      setNotificationToast(null);
+    }, 4000);
+  }, [activeDevice, isDispensing, startCooldown]);
+
   const triggerDispense = useCallback(async (durationOverride?: number) => {
     if (isDispensing || cooldownRemaining > 0) return;
 
@@ -95,7 +129,7 @@ export function useDeviceFeed(
         ? durationOverride
         : typeof selectedDurationMs === 'number' && !isNaN(selectedDurationMs) && selectedDurationMs > 0
         ? selectedDurationMs
-        : 60000;
+        : 30000;
 
     triggerHaptic('medium');
     setIsDispensing(true);
@@ -172,6 +206,7 @@ export function useDeviceFeed(
     feedStatus,
     notificationToast,
     triggerDispense,
+    stopDispense,
     skipCooldown,
   };
 }

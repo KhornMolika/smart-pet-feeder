@@ -6,7 +6,7 @@ import { FeederDevice, PortionPreset } from '@/types/feeder.types';
 import { PetIcon, PresetIcon } from '@/components/common/pet-icon';
 import { formatDuration } from '@/lib/utils/date.util';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
-import { Sparkles, Clock, Cog, CheckCircle2, PawPrint, Zap, Bell } from 'lucide-react';
+import { Sparkles, Clock, Cog, CheckCircle2, PawPrint, Zap, Bell, Square } from 'lucide-react';
 
 interface FeedActuatorCardProps {
   activeDevice: FeederDevice;
@@ -22,6 +22,7 @@ interface FeedActuatorCardProps {
   feedStatus: 'idle' | 'actuating' | 'success' | 'error';
   notificationToast: string | null;
   onTriggerDispense: () => void;
+  onStopDispense?: () => void;
   onSkipCooldown: () => void;
 }
 
@@ -39,6 +40,7 @@ export function FeedActuatorCard({
   feedStatus,
   notificationToast,
   onTriggerDispense,
+  onStopDispense,
   onSkipCooldown,
 }: FeedActuatorCardProps) {
   const isCooldown = cooldownRemaining > 0;
@@ -163,12 +165,12 @@ export function FeedActuatorCard({
               type="button"
               onClick={() => {
                 triggerHaptic('light');
-                const next = Math.max(30000, selectedDurationMs - 15000);
+                const next = Math.max(15000, selectedDurationMs - 15000);
                 setSelectedDurationMs(next);
                 const match = presets.find((p) => p.durationMs === next);
                 setActivePresetId(match ? match.id : null);
               }}
-              disabled={selectedDurationMs <= 30000}
+              disabled={selectedDurationMs <= 15000}
               className="px-2.5 py-1 rounded-lg bg-white border border-[#143503]/15 hover:bg-[#FFF2E6] disabled:opacity-35 text-[#143503] font-mono font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer select-none"
               title="Decrease 15 seconds"
             >
@@ -200,11 +202,11 @@ export function FeedActuatorCard({
           <div
             className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
               isDispensing
-                ? 'bg-[#A7D1AE] text-[#143503] border-[#143503]/30 animate-pulse'
+                ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
                 : 'bg-[#FFF2E6]/70 text-[#4B633E] border-[#143503]/10'
             }`}
           >
-            <span className={`w-1.5 h-1.5 rounded-full ${isDispensing ? 'bg-[#143503] animate-ping' : 'bg-emerald-600'}`} />
+            <span className={`w-1.5 h-1.5 rounded-full ${isDispensing ? 'bg-rose-600 animate-ping' : 'bg-emerald-600'}`} />
             <span className="tracking-wide">
               {isDispensing
                 ? `Dispensing Food (${formatDuration(selectedDurationMs)})`
@@ -218,23 +220,30 @@ export function FeedActuatorCard({
           <button
             id="dispense-food-btn"
             type="button"
-            onClick={() => onTriggerDispense()}
-            disabled={isDispensing}
+            onClick={() => {
+              if (isDispensing) {
+                onStopDispense?.();
+              } else {
+                onTriggerDispense();
+              }
+            }}
+            disabled={isCooldown}
             className={`relative w-32 h-32 rounded-full flex flex-col items-center justify-center cursor-pointer select-none transition-all duration-200 active:scale-95 text-[#FFF2E6] ${
               isDispensing
-                ? 'bg-[#143503] shadow-[0_0_30px_rgba(20,53,3,0.4)] animate-pulse'
+                ? 'bg-rose-600 shadow-[0_0_35px_rgba(225,29,72,0.45)] hover:bg-rose-700 animate-pulse'
                 : isCooldown
                 ? 'bg-[#4B633E] text-[#FFF2E6]/70'
                 : 'bg-[#143503] shadow-[0_8px_25px_rgba(20,53,3,0.3)] hover:shadow-[0_12px_30px_rgba(20,53,3,0.4)] hover:scale-[1.02]'
             }`}
+            title={isDispensing ? 'Click to Stop Dispense immediately' : 'Click to Dispense Food'}
           >
             {isDispensing ? (
               <>
-                <Cog size={28} className="animate-spin text-[#FFF2E6] mb-1" />
+                <Square size={26} className="fill-[#FFF2E6] text-[#FFF2E6] mb-1 animate-pulse" />
                 <span className="text-xs font-bold tracking-wider uppercase text-[#FFF2E6]">
-                  Dispensing...
+                  Stop Feed
                 </span>
-                <span className="text-xs text-[#A7D1AE] font-mono mt-0.5">
+                <span className="text-xs text-rose-200 font-mono mt-0.5">
                   {formatDuration(actuationRemainingMs)} left
                 </span>
               </>
@@ -272,17 +281,26 @@ export function FeedActuatorCard({
           </button>
         </div>
 
-        {/* Food Dispensing Progress Bar */}
+        {/* Food Dispensing Progress Bar & Stop Feed Action */}
         {isDispensing && (
-          <div className="w-52 mt-1 animate-fadeIn">
-            <div className="w-full h-2 rounded-full bg-[#143503]/15 overflow-hidden">
+          <div className="flex flex-col items-center gap-2 mt-1 animate-fadeIn">
+            <div className="w-52 h-2 rounded-full bg-[#143503]/15 overflow-hidden">
               <div
-                className="h-full rounded-full bg-[#143503] transition-all duration-75"
+                className="h-full rounded-full bg-rose-600 transition-all duration-75"
                 style={{
                   width: `${Math.min(100, (actuationRemainingMs / selectedDurationMs) * 100)}%`,
                 }}
               />
             </div>
+            <button
+              id="stop-dispense-action-btn"
+              type="button"
+              onClick={() => onStopDispense?.()}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition-all active:scale-95 cursor-pointer mt-1"
+            >
+              <Square size={12} className="fill-white" />
+              <span>Stop Feeding Now</span>
+            </button>
           </div>
         )}
 

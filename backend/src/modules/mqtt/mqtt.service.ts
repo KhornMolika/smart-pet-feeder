@@ -135,6 +135,30 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
+   * Publishes an immediate stop command to close the dispenser gate on ESP32 hardware.
+   */
+  publishStopCommand(deviceId: string): boolean {
+    if (!this.client || !this.client.connected) {
+      this.logger.warn(
+        `Cannot publish stop command to ${deviceId}: MQTT client not connected.`,
+      );
+      return false;
+    }
+
+    const payload = JSON.stringify({
+      action: 'stop',
+      commandId: `stop_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Publish to both dedicated cmd/stop and cmd/feed for maximum compatibility
+    this.client.publish(`feeders/${deviceId}/cmd/stop`, payload, { qos: 1 });
+    this.client.publish(`feeders/${deviceId}/cmd/feed`, payload, { qos: 1 });
+    this.logger.log(`[MQTT OUT] 🛑 Published stop feed command to ${deviceId}`);
+    return true;
+  }
+
+  /**
    * Publishes desired configuration (schedules, settings) to ESP32 for offline storage.
    */
   publishDesiredConfig(deviceId: string, config: Record<string, unknown>): boolean {

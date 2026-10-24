@@ -34,6 +34,15 @@ export class FeederController {
     return this.feederService.triggerManualFeed(deviceId, dto, userId);
   }
 
+  @Post('stop')
+  @HttpCode(HttpStatus.OK)
+  async stopFeed(
+    @Param('deviceId') deviceId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.feederService.stopFeed(deviceId, userId);
+  }
+
   @Get('schedules')
   async getSchedules(@Param('deviceId') deviceId: string) {
     return this.feederService.getSchedules(deviceId);

@@ -136,6 +136,7 @@ function FeedDashboard({
     feedStatus,
     notificationToast,
     triggerDispense,
+    stopDispense,
     skipCooldown,
   } = useDeviceFeed(activeDevice, handleFeedSuccess);
 
@@ -186,6 +187,7 @@ function FeedDashboard({
         feedStatus={feedStatus}
         notificationToast={notificationToast}
         onTriggerDispense={triggerDispense}
+        onStopDispense={stopDispense}
         onSkipCooldown={skipCooldown}
       />
 

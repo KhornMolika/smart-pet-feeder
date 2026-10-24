@@ -70,7 +70,7 @@ export function PortionTimersCard({
         </div>
         <input
           type="range"
-          min={30000}
+          min={5000}
           max={180000}
           step={5000}
           value={snackMs}
@@ -79,7 +79,7 @@ export function PortionTimersCard({
         />
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {[30000, 45000, 60000, 90000].map((ms) => (
+            {[10000, 15000, 20000, 30000].map((ms) => (
               <button
                 key={ms}
                 type="button"
@@ -96,12 +96,12 @@ export function PortionTimersCard({
             <span>Set:</span>
             <input
               type="number"
-              min={30}
+              min={5}
               max={180}
               value={Math.round(snackMs / 1000)}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) setSnackMs(Math.max(30000, Math.min(180000, val * 1000)));
+                if (!isNaN(val)) setSnackMs(Math.max(5000, Math.min(180000, val * 1000)));
               }}
               className="w-12 px-1 py-0.5 text-center font-mono font-bold text-xs bg-white border border-[#143503]/15 rounded text-[#143503]"
             />
@@ -125,7 +125,7 @@ export function PortionTimersCard({
         </div>
         <input
           type="range"
-          min={30000}
+          min={10000}
           max={180000}
           step={5000}
           value={bowlMs}
@@ -134,7 +134,7 @@ export function PortionTimersCard({
         />
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {[45000, 60000, 90000, 120000].map((ms) => (
+            {[20000, 25000, 30000, 45000].map((ms) => (
               <button
                 key={ms}
                 type="button"
@@ -151,12 +151,12 @@ export function PortionTimersCard({
             <span>Set:</span>
             <input
               type="number"
-              min={30}
+              min={10}
               max={180}
               value={Math.round(bowlMs / 1000)}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) setBowlMs(Math.max(30000, Math.min(180000, val * 1000)));
+                if (!isNaN(val)) setBowlMs(Math.max(10000, Math.min(180000, val * 1000)));
               }}
               className="w-12 px-1 py-0.5 text-center font-mono font-bold text-xs bg-white border border-[#143503]/15 rounded text-[#143503]"
             />
@@ -180,7 +180,7 @@ export function PortionTimersCard({
         </div>
         <input
           type="range"
-          min={30000}
+          min={15000}
           max={180000}
           step={5000}
           value={feastMs}
@@ -189,7 +189,7 @@ export function PortionTimersCard({
         />
         <div className="flex items-center justify-between gap-2 pt-0.5">
           <div className="flex items-center gap-1.5 flex-wrap">
-            {[90000, 120000, 150000, 180000].map((ms) => (
+            {[30000, 40000, 45000, 60000].map((ms) => (
               <button
                 key={ms}
                 type="button"
@@ -206,12 +206,12 @@ export function PortionTimersCard({
             <span>Set:</span>
             <input
               type="number"
-              min={30}
+              min={15}
               max={180}
               value={Math.round(feastMs / 1000)}
               onChange={(e) => {
                 const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) setFeastMs(Math.max(30000, Math.min(180000, val * 1000)));
+                if (!isNaN(val)) setFeastMs(Math.max(15000, Math.min(180000, val * 1000)));
               }}
               className="w-12 px-1 py-0.5 text-center font-mono font-bold text-xs bg-white border border-[#143503]/15 rounded text-[#143503]"
             />
