@@ -37,4 +37,16 @@ export class UpdateScheduleDto {
   @IsBoolean()
   @IsOptional()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @IsOptional()
+  @IsInt()
+  priority?: number;
 }

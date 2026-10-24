@@ -35,4 +35,16 @@ export class CreateScheduleDto {
   @IsBoolean()
   @IsOptional()
   enabled: boolean = true;
+
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsOptional()
+  @IsString()
+  deviceId?: string;
+
+  @IsOptional()
+  @IsInt()
+  priority?: number;
 }
