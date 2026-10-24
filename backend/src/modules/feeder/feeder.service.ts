@@ -65,20 +65,26 @@ export class FeederService implements OnModuleInit {
     }
   }
 
-  onModuleInit() {
+  async onModuleInit() {
     // Handle incoming MQTT events from ESP32
     this.mqttService.events.on('feedEvent', async (eventData) => {
       await this.recordHardwareEvent(eventData);
     });
+    await this.seedDefaultSchedules('feeder_esp32_01');
   }
 
   private async seedDefaultSchedules(deviceId: string) {
     try {
-      const count = await this.scheduleRepository.count({ where: { deviceId } });
+      const targetId = (deviceId || 'feeder_esp32_01')
+        .replace(/^claim_/, '')
+        .replace(/-/g, '_')
+        .replace(/_001$/, '_01');
+      const count = await this.scheduleRepository.count({ where: { deviceId: targetId } });
       if (count === 0) {
         await this.scheduleRepository.save([
           this.scheduleRepository.create({
-            deviceId,
+            deviceId: targetId,
+            device: { id: targetId } as any,
             label: 'Breakfast Crunch',
             timeLocal: '07:30',
             daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
@@ -87,7 +93,8 @@ export class FeederService implements OnModuleInit {
             version: 1,
           }),
           this.scheduleRepository.create({
-            deviceId,
+            deviceId: targetId,
+            device: { id: targetId } as any,
             label: 'Dinner Feast',
             timeLocal: '18:00',
             daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
@@ -96,10 +103,10 @@ export class FeederService implements OnModuleInit {
             version: 1,
           }),
         ]);
-        this.logger.log(`Seeded default feeding schedules for ${deviceId}`);
+        this.logger.log(`Seeded default feeding schedules for ${targetId}`);
       }
-    } catch {
-      // Ignored
+    } catch (err: unknown) {
+      this.logger.warn(`Failed to seed default schedules: ${(err as Error)?.message}`);
     }
   }
 
@@ -233,18 +240,10 @@ export class FeederService implements OnModuleInit {
   // --------------------------------------------------------------------------
   async getSchedules(deviceId: string): Promise<FeedingSchedule[]> {
     const targetHardwareIds = getHardwareDeviceIds(deviceId);
-    let schedules = await this.scheduleRepository.find({
+    return this.scheduleRepository.find({
       where: targetHardwareIds.map((id) => ({ deviceId: id })),
       order: { timeLocal: 'ASC' },
     });
-    if (schedules.length === 0) {
-      await this.seedDefaultSchedules(deviceId);
-      schedules = await this.scheduleRepository.find({
-        where: targetHardwareIds.map((id) => ({ deviceId: id })),
-        order: { timeLocal: 'ASC' },
-      });
-    }
-    return schedules;
   }
 
   async createSchedule(
@@ -255,9 +254,13 @@ export class FeederService implements OnModuleInit {
       .replace(/^claim_/, '')
       .replace(/-/g, '_')
       .replace(/_001$/, '_01');
+
+    const { deviceId: _dtoDeviceId, id: _dtoId, ...scheduleData } = dto;
+
     const schedule = this.scheduleRepository.create({
+      ...scheduleData,
       deviceId: targetId,
-      ...dto,
+      device: { id: targetId } as any,
       version: 1,
     });
     const saved = await this.scheduleRepository.save(schedule);
@@ -281,10 +284,14 @@ export class FeederService implements OnModuleInit {
       throw new NotFoundException(`Schedule ${id} not found`);
     }
 
-    Object.assign(schedule, dto);
-    schedule.version += 1;
+    const { deviceId: _dtoDeviceId, id: _dtoId, ...updateData } = dto;
+    Object.assign(schedule, updateData);
+    const targetId = schedule.deviceId || targetHardwareIds[0] || 'feeder_esp32_01';
+    schedule.deviceId = targetId;
+    schedule.device = { id: targetId } as any;
+    schedule.version = (schedule.version || 1) + 1;
     const updated = await this.scheduleRepository.save(schedule);
-    await this.syncSchedulesToMqtt(deviceId);
+    await this.syncSchedulesToMqtt(schedule.deviceId);
     return updated;
   }
 
@@ -307,10 +314,10 @@ export class FeederService implements OnModuleInit {
   private async syncSchedulesToMqtt(deviceId: string) {
     const allSchedules = await this.getSchedules(deviceId);
     const compactSchedules = allSchedules.map((s) => {
-      const [h, m] = s.timeLocal.split(':').map(Number);
+      const [h, m] = (s.timeLocal || '12:00').split(':').map(Number);
       return {
-        hour: h,
-        minute: m,
+        hour: Number.isFinite(h) ? h : 12,
+        minute: Number.isFinite(m) ? m : 0,
         durationMs: s.durationMs,
         enabled: s.enabled,
         label: s.label,
