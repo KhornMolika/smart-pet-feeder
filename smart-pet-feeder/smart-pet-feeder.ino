@@ -52,13 +52,13 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials
 // - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
 // - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
-const char* WIFI_SSID     = "vivo X50";
-const char* WIFI_PASSWORD = "03062005";
+const char* WIFI_SSID     = "AUB-4F-A";
+const char* WIFI_PASSWORD = "";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
 // - For Physical Hardware: Change to your laptop IP "192.168.1.17" or AWS Public IP
-const char* MQTT_SERVER   = "broker.hivemq.com";
+const char* MQTT_SERVER   = "chinchem.molika.app";
 const int   MQTT_PORT     = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASS     = "";

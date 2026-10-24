@@ -1,6 +1,6 @@
 # Smart Pet Feeder — System Design & Requirements
 
-**Status:** Revised MVP specification — DS1302 confirmed; no load cell; MQTT hosting undecided
+**Status:** Revised MVP specification — DS3231 I2C confirmed; no load cell; MQTT hosting undecided
 
 ## 1. Overview and scope
 A Wi-Fi-connected, ESP32-based feeder for dry pet food. Owners manage feeding schedules, manually dispense food, review history, and receive alerts using a **Telegram Mini App**. The ESP32 executes saved schedules locally with an RTC when Wi-Fi or the backend is unavailable.
@@ -42,7 +42,7 @@ flowchart TD
     API -->|Bot API HTTPS| TG[Telegram Bot Notifications]
     API <-->|MQTT over TLS| MQ[MQTT Broker / Mosquitto]
     ESP[ESP32 Firmware] <-->|MQTT over TLS| MQ
-    ESP --> RTC[DS1302 RTC]
+    ESP --> RTC[DS3231 I2C RTC]
     ESP --> LCD[I2C LCD]
     ESP --> SERVO[Servo + external regulated supply]
     ESP --> BUTTON[Push button]
@@ -56,7 +56,7 @@ The **NestJS backend** is the only application component that publishes commands
 | ESP32 development board | Wi-Fi, logic, MQTT | Required |
 | SG90 9g servo | Opens/closes food gate | Required for prototype; torque and load need testing |
 | Physical push button | Local manual dispense | Required; GPIO with pull-up and debounce |
-| DS1302 RTC module + backup battery | Offline timekeeping | Required; 3-wire DAT/CLK/RST interface; validate logic-level compatibility |
+| DS3231 RTC module + backup battery | Offline timekeeping | Required; I2C interface (address 0x68); shared bus with LCD on GPIO 21/22 |
 | 16x2 I2C LCD | Local status | Required; check module logic-voltage compatibility |
 | Buzzer | Sound notifications | Required; driver/transistor if current exceeds GPIO rating |
 | Regulated 5V servo supply | Motor power | Required; adequate current, common ground with ESP32 |
@@ -70,11 +70,10 @@ The **NestJS backend** is the only application component that publishes commands
 ### 4.1 Suggested ESP32 wiring (verify board pinout and module voltage)
 | Peripheral | ESP32 pin | Voltage / notes |
 |---|---|---|
-| Servo signal | GPIO 4 | External regulated servo power; common ground (moved from 18 to free pin for RTC CLK) |
+| Servo signal | GPIO 19 | External regulated servo power; common ground (moved to GPIO 19) |
 | Button | GPIO 27 | Input pull-up; switch to GND; debounce in firmware |
 | Buzzer signal | GPIO 25 | Use transistor/driver if necessary |
-| LCD SDA / SCL | GPIO 21 / GPIO 22 | I²C; check voltage and level shifting |
-| DS1302 DAT / CLK / RST | GPIO 19 / GPIO 18 / GPIO 5 | ThreeWire interface; check RTC module voltage and logic levels (3.3V recommended) |
+| LCD & DS3231 SDA / SCL | GPIO 21 / GPIO 22 | Shared I²C bus (LCD: 0x27, DS3231: 0x68) |
 
 ## 5. Tech stack and protocols
 | Layer | Choice |
@@ -93,8 +92,7 @@ The **NestJS backend** is the only application component that publishes commands
 | HTTPS / REST | Next.js ↔ NestJS; backend ↔ Telegram Bot API |
 | MQTT with TLS | Backend ↔ broker ↔ ESP32 commands, telemetry, events |
 | WebSocket / SSE (optional) | Live Mini App status updates; polling is enough for MVP |
-| I²C | LCD only |
-| 3-wire synchronous serial | DS1302 RTC (DAT, CLK, RST) |
+| I²C | 16x2 LCD (0x27) & DS3231 RTC (0x68) |
 | GPIO / PWM | Button, servo, buzzer |
 | NTP | Network time sync; RTC fallback offline |
 

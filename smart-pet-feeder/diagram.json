@@ -61,7 +61,7 @@
   "connections": [
     [ "servo:V+", "esp:VIN", "red", [ "v0" ] ],
     [ "servo:GND", "esp:GND.1", "black", [ "v0" ] ],
-    [ "servo:PWM", "esp:D4", "orange", [ "v0" ] ],
+    [ "servo:PWM", "esp:D19", "orange", [ "v0" ] ],
 
     [ "lcd:VCC", "esp:VIN", "red", [ "v0" ] ],
     [ "lcd:GND", "esp:GND.1", "black", [ "v0" ] ],
