@@ -5,6 +5,7 @@ import { FeederDevice, PortionPreset } from '@/types/feeder.types';
 import { INITIAL_DEVICES, DEMO_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/constants/feeder.constants';
 
 import { getBackendApiUrl } from '@/lib/api-config';
+import { getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
 
 const STORAGE_KEY_DEVICES = 'chinchum_fleet_devices';
 const STORAGE_KEY_ACTIVE_ID = 'chinchum_active_device_id';
@@ -169,10 +170,7 @@ export function useFeederFleet() {
       if (deviceData.claimToken) {
         fetch(`${getBackendApiUrl()}/api/v1/devices/claim`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-bff-source': 'NextJS-AppRouter',
-          },
+          headers: getTelegramAuthHeaders(),
           body: JSON.stringify({
             claimToken: deviceData.claimToken,
             petName: deviceData.petName,
@@ -210,10 +208,7 @@ export function useFeederFleet() {
     if (deviceData.claimToken) {
       fetch(`${getBackendApiUrl()}/api/v1/devices/claim`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-bff-source': 'NextJS-AppRouter',
-        },
+        headers: getTelegramAuthHeaders(),
         body: JSON.stringify({
           claimToken: deviceData.claimToken,
           petName: deviceData.petName,

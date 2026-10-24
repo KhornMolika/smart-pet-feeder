@@ -93,7 +93,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
       if (category === 'event' && action === 'feed') {
         const data: FeedEventPayload = JSON.parse(message);
         this.logger.log(
-          `[MQTT] Feed event from ${deviceId}: ${data.source} (${data.durationMs}ms) - ${data.status}`,
+          `[MQTT IN] 📥 Feed completion event received from ${deviceId}: source=${data.source}, duration=${data.durationMs}ms, status=${data.status}`,
         );
         this.events.emit('feedEvent', { deviceId, ...data });
       } else if (category === 'state') {
@@ -101,7 +101,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
         this.events.emit('deviceState', { ...data, deviceId });
       } else if (category === 'availability') {
         const isOnline = message.trim().toLowerCase() === 'online';
-        this.logger.log(`[MQTT] Device ${deviceId} availability: ${message}`);
+        this.logger.log(`[MQTT IN] ⚡ Device ${deviceId} availability: ${message}`);
         this.events.emit('deviceAvailability', { deviceId, isOnline });
       }
     } catch (err: unknown) {
@@ -130,7 +130,7 @@ export class MqttService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.client.publish(topic, payload, { qos: 1 });
-    this.logger.log(`Published feed command to ${topic} (${durationMs}ms)`);
+    this.logger.log(`[MQTT OUT] 🚀 Published feed command to topic '${topic}' (${durationMs}ms)`);
     return true;
   }
 

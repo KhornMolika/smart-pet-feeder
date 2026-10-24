@@ -86,6 +86,70 @@ export function getTelegramStartParam(): string | null {
   return null;
 }
 
+export interface TelegramUserInfo {
+  id: number;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  displayName: string;
+}
+
+export function getTelegramUser(): TelegramUserInfo | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const tg = (window as unknown as {
+      Telegram?: {
+        WebApp?: {
+          initDataUnsafe?: {
+            user?: {
+              id: number;
+              first_name: string;
+              last_name?: string;
+              username?: string;
+            };
+          };
+        };
+      };
+    }).Telegram?.WebApp;
+
+    const user = tg?.initDataUnsafe?.user;
+    if (user && user.first_name) {
+      const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ');
+      return {
+        id: user.id,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        username: user.username,
+        displayName: displayName || user.first_name,
+      };
+    }
+  } catch {}
+
+  return null;
+}
+
+export function getTelegramAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-bff-source': 'NextJS-AppRouter',
+  };
+
+  const user = getTelegramUser();
+  if (user) {
+    headers['x-telegram-user-id'] = String(user.id);
+    headers['x-telegram-user-name'] = user.displayName;
+    if (user.username) headers['x-telegram-username'] = user.username;
+  }
+
+  const initData = getTelegramInitData();
+  if (initData) {
+    headers['x-telegram-init-data'] = initData;
+  }
+
+  return headers;
+}
+
 export function getTelegramInitData(): string | null {
   if (typeof window === 'undefined') return null;
   return (

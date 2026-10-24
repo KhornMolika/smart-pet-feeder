@@ -108,7 +108,9 @@ export function useDeviceFeed(
       ? activeDevice.claimToken.replace(/^claim_/, '')
       : activeDevice.id.replace(/^feeder-/, 'feeder_').replace(/-([a-zA-Z0-9]+)$/, '_$1');
 
-    fetch(`${getBackendApiUrl()}/api/v1/feeders/${hardwareDeviceId}/feed`, {
+    console.log(`[Feed Now] Sending feed command: device=${hardwareDeviceId}, duration=${duration}ms`);
+
+    fetch(`${getBackendApiUrl()}/api/v1/devices/${hardwareDeviceId}/feed`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -118,9 +120,18 @@ export function useDeviceFeed(
         durationMs: duration,
         source: 'manual_app',
       }),
-    }).catch(() => {
-      // Fallback gracefully in client cache
-    });
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          console.error('[Feed Now] Backend feed dispatch failed:', res.status, body);
+        } else {
+          console.log(`[Feed Now] ✅ Successfully dispatched feed command to ESP32 (${duration}ms)`);
+        }
+      })
+      .catch((err) => {
+        console.error('[Feed Now] Network error triggering feed:', err);
+      });
 
     const notifConfig = getStoredNotificationConfig();
 

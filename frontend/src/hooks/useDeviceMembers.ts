@@ -3,29 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DeviceMember } from '@/types/feeder.types';
 import { getBackendApiUrl } from '@/lib/api-config';
+import { getTelegramUser, getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
 
 const STORAGE_KEY_MEMBERS_PREFIX = 'chinchum_device_members_';
-
-const DEFAULT_MEMBERS: DeviceMember[] = [
-  {
-    id: 'member_owner_alex',
-    deviceId: 'feeder_esp32_01',
-    userId: 'owner_bff_user',
-    userName: 'Alex (You)',
-    role: 'owner',
-    avatarEmoji: '👑',
-    createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
-  },
-  {
-    id: 'member_family_sarah',
-    deviceId: 'feeder_esp32_01',
-    userId: 'family_sarah',
-    userName: 'Sarah',
-    role: 'family',
-    avatarEmoji: '👤',
-    createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
-  },
-];
 
 export function useDeviceMembers(deviceId: string) {
   const [members, setMembers] = useState<DeviceMember[]>([]);
@@ -34,17 +14,24 @@ export function useDeviceMembers(deviceId: string) {
   // Load members from backend or localStorage cache
   const loadMembers = useCallback(async () => {
     setIsLoading(true);
+    const tgUser = getTelegramUser();
+    const currentOwnerName = tgUser?.displayName ? `${tgUser.displayName} (You)` : 'Owner (You)';
+
     try {
       const res = await fetch(`${getBackendApiUrl()}/api/v1/devices/${deviceId}/members`, {
-        headers: { 'x-bff-source': 'NextJS-AppRouter' },
+        headers: getTelegramAuthHeaders(),
       });
 
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
-          setMembers(data);
+          // Normalize owner display name to the authenticated Telegram user
+          const normalized = data.map((m: DeviceMember) =>
+            m.role === 'owner' ? { ...m, userName: currentOwnerName } : m
+          );
+          setMembers(normalized);
           try {
-            localStorage.setItem(`${STORAGE_KEY_MEMBERS_PREFIX}${deviceId}`, JSON.stringify(data));
+            localStorage.setItem(`${STORAGE_KEY_MEMBERS_PREFIX}${deviceId}`, JSON.stringify(normalized));
           } catch {}
           setIsLoading(false);
           return;
@@ -52,21 +39,37 @@ export function useDeviceMembers(deviceId: string) {
       }
     } catch {}
 
-    // Fallback to localStorage or default seed
+    // Fallback to localStorage or real Telegram user default
     try {
       const cached = localStorage.getItem(`${STORAGE_KEY_MEMBERS_PREFIX}${deviceId}`);
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setMembers(parsed);
+          // Replace legacy hardcoded 'Alex (You)' with real Telegram user
+          const normalized = parsed
+            .filter((m: DeviceMember) => m.id !== 'member_family_sarah')
+            .map((m: DeviceMember) =>
+              m.role === 'owner' ? { ...m, userName: currentOwnerName } : m
+            );
+          setMembers(normalized);
           setIsLoading(false);
           return;
         }
       }
     } catch {}
 
-    const seeded = DEFAULT_MEMBERS.map((m) => ({ ...m, deviceId }));
-    setMembers(seeded);
+    // Clean initial state: Authenticated user is the primary owner
+    const defaultOwner: DeviceMember = {
+      id: `member_owner_${tgUser?.id || 'primary'}`,
+      deviceId,
+      userId: tgUser?.id ? `tg_${tgUser.id}` : 'owner_user',
+      userName: currentOwnerName,
+      role: 'owner',
+      avatarEmoji: '👑',
+      createdAt: new Date().toISOString(),
+    };
+
+    setMembers([defaultOwner]);
     setIsLoading(false);
   }, [deviceId]);
 

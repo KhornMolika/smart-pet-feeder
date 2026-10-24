@@ -143,11 +143,25 @@ export class FeederService implements OnModuleInit {
       await manager.save(event);
 
       // 4. Publish feed command to ESP32 over MQTT
+      this.logger.log(
+        `[FeederService] 🍽️ Triggering feed command for ${deviceId}: ${boundsCheck.clampedDuration}ms (Requested by: ${requestedBy})`,
+      );
+
       this.mqttService.publishFeedCommand(
         deviceId,
         command.id,
         boundsCheck.clampedDuration,
       );
+
+      // Publish to normalized hardware ID if different (e.g. feeder-esp32-01 -> feeder_esp32_01)
+      const normalizedHardwareId = deviceId.replace(/^feeder-/, 'feeder_').replace(/_001$/, '_01');
+      if (normalizedHardwareId !== deviceId) {
+        this.mqttService.publishFeedCommand(
+          normalizedHardwareId,
+          command.id,
+          boundsCheck.clampedDuration,
+        );
+      }
 
       // 5. Broadcast to linked Telegram Group (if not initiated from the group itself)
       if (!requestedBy.startsWith('telegram_group')) {

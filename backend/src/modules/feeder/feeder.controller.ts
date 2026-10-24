@@ -19,7 +19,7 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto.js';
 import { TelegramAuthGuard } from '../../common/guards/telegram-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 
-@Controller('api/v1/devices/:deviceId')
+@Controller(['api/v1/devices/:deviceId', 'api/v1/feeders/:deviceId'])
 @UseGuards(TelegramAuthGuard)
 export class FeederController {
   constructor(private readonly feederService: FeederService) {}

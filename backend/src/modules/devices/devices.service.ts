@@ -216,12 +216,12 @@ export class DevicesService implements OnModuleInit {
 
       if (device.isClaimed && device.ownerId !== user.id) {
         throw new ConflictException(
-          'This feeder has already been claimed by another owner. Please contact support or request family access.',
+          'This feeder has already been claimed by another owner. Please request an invitation from the owner to join as a family member.',
         );
       }
 
       // Claim and bind device to this user
-      device.ownerId = user.id || 'owner_bff_user';
+      device.ownerId = user.id;
       device.petName = dto.petName.trim();
       device.petEmoji = dto.petEmoji || 'cat';
       device.room = dto.room?.trim() || 'Living Room';
@@ -230,39 +230,51 @@ export class DevicesService implements OnModuleInit {
       device.claimedAt = new Date();
 
       const saved = await manager.save(device);
+
+      // Upsert owner member record with real Telegram user info
+      const ownerName = user.firstName ? `${user.firstName} (You)` : 'Owner (You)';
+      let ownerMember = await manager.findOne(DeviceMember, {
+        where: { deviceId: device.id, role: 'owner' },
+      });
+      if (!ownerMember) {
+        ownerMember = manager.create(DeviceMember, {
+          deviceId: device.id,
+          userId: user.id,
+          telegramId: user.telegramId,
+          userName: ownerName,
+          role: 'owner',
+          avatarEmoji: '👑',
+        });
+      } else {
+        ownerMember.userId = user.id;
+        ownerMember.userName = ownerName;
+        ownerMember.telegramId = user.telegramId;
+      }
+      await manager.save(ownerMember);
+
       return saved;
     });
   }
 
-  async getDeviceMembers(deviceId: string): Promise<DeviceMember[]> {
+  async getDeviceMembers(deviceId: string, user?: AuthenticatedUser): Promise<DeviceMember[]> {
     let members = await this.memberRepository.find({
       where: { deviceId },
       order: { createdAt: 'ASC' },
     });
 
     if (members.length === 0) {
-      // Auto-populate default owner and family member if database is fresh
+      // Auto-populate authenticated owner without mock family accounts
+      const ownerName = user?.firstName ? `${user.firstName} (You)` : 'Owner (You)';
       const defaultOwner = this.memberRepository.create({
         deviceId,
-        userId: 'owner_bff_user',
-        telegramId: 999888777,
-        userName: 'Alex (You)',
+        userId: user?.id || 'owner_user',
+        telegramId: user?.telegramId,
+        userName: ownerName,
         role: 'owner',
         avatarEmoji: '👑',
       });
       await this.memberRepository.save(defaultOwner);
-
-      const familyMember = this.memberRepository.create({
-        deviceId,
-        userId: 'family_sarah',
-        telegramId: 888777666,
-        userName: 'Sarah',
-        role: 'family',
-        avatarEmoji: '👤',
-      });
-      await this.memberRepository.save(familyMember);
-
-      members = [defaultOwner, familyMember];
+      return [defaultOwner];
     }
 
     return members;

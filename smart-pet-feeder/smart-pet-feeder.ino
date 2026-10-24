@@ -66,11 +66,11 @@ const char* MQTT_PASS     = "";
 // ----------------------------------------------------------------------------
 // SAFETY LIMITS & TIMINGS
 // ----------------------------------------------------------------------------
-#define SERVO_CLOSED_ANGLE     0
-#define SERVO_OPEN_ANGLE       180
+#define SERVO_CLOSED_ANGLE     0      // Gate fully shut
+#define SERVO_OPEN_ANGLE       90     // Gate open 90° for full gravity drop without stalling
 #define MIN_DURATION_MS        200
 #define MAX_DURATION_MS        180000
-#define DEFAULT_DURATION_MS    1500
+#define DEFAULT_DURATION_MS    30000  // 30s standard portion, matches webapp default Light Snack
 #define COOLDOWN_MS            3000   // 3-second motor safety cooldown
 #define DEBOUNCE_DELAY_MS      50
 #define MAX_SCHEDULES          8
@@ -240,52 +240,58 @@ FeederDateTime rtcGetTime() {
 }
 
 // ----------------------------------------------------------------------------
-// BUZZER MELODIES & TONES
+// BUZZER MELODIES & TONES (Active Buzzer Safe: No LEDC Timer Conflicts!)
 // ----------------------------------------------------------------------------
 void buzzerChirpSuccess() {
-  tone(PIN_BUZZER, 2093, 80); // C7
-  delay(90);
-  tone(PIN_BUZZER, 2637, 120); // E7
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(80);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(60);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(120);
+  digitalWrite(PIN_BUZZER, LOW);
 }
 
 void buzzerChirpComplete() {
-  tone(PIN_BUZZER, 3136, 100); // G7
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(100);
+  digitalWrite(PIN_BUZZER, LOW);
 }
 
 void buzzerBeepError() {
-  tone(PIN_BUZZER, 440, 150);
-  delay(180);
-  tone(PIN_BUZZER, 330, 200);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(150);
+  digitalWrite(PIN_BUZZER, LOW);
+  delay(100);
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(200);
+  digitalWrite(PIN_BUZZER, LOW);
 }
 
 // ----------------------------------------------------------------------------
 // SERVO CONTROL & DISPENSE ENGINE
 // ----------------------------------------------------------------------------
-void closeGate() {
-  if (!foodServo.attached()) {
-    foodServo.attach(PIN_SERVO, 500, 2400);
-  }
-  foodServo.write(SERVO_CLOSED_ANGLE);
-  delay(300); // Allow physical arm to reach mechanical close
-  foodServo.detach(); // De-energize servo to prevent buzzing, heat & brownout
+void openGate() {
+  Serial.printf("[Servo] Opening dispenser gate to %d°...\n", SERVO_OPEN_ANGLE);
+  foodServo.write(SERVO_OPEN_ANGLE);
 }
 
-void openGate() {
-  if (!foodServo.attached()) {
-    foodServo.attach(PIN_SERVO, 500, 2400);
-  }
-  foodServo.write(SERVO_OPEN_ANGLE);
+void closeGate() {
+  Serial.printf("[Servo] Closing dispenser gate to %d°...\n", SERVO_CLOSED_ANGLE);
+  foodServo.write(SERVO_CLOSED_ANGLE);
 }
 
 bool startDispense(uint16_t durationMs, const char* source, const char* cmdId) {
   // Check safety cooldown
   unsigned long now = millis();
   if (currentState != STATE_IDLE) {
+    Serial.printf("[Feeder] ⚠️ Cannot dispense: machine busy in state %d\n", currentState);
     buzzerBeepError();
     return false;
   }
 
   if (lastDispenseEndTime > 0 && (now - lastDispenseEndTime < COOLDOWN_MS)) {
+    Serial.println(F("[Feeder] ⚠️ Cannot dispense: within 3s motor cooldown"));
     buzzerBeepError();
     return false;
   }
@@ -305,23 +311,24 @@ bool startDispense(uint16_t durationMs, const char* source, const char* cmdId) {
   currentState = STATE_DISPENSING;
   dispenseStartTime = now;
 
+  Serial.printf("\n==================================================\n");
+  Serial.printf("[Feeder] 🍽️ DISPENSE STARTED!\n");
+  Serial.printf("  Source:   %s\n", activeSource);
+  Serial.printf("  Duration: %d ms (%us)\n", activeDurationMs, activeDurationMs / 1000);
+  Serial.printf("  CmdId:    %s\n", activeCommandId);
+  Serial.printf("==================================================\n");
+
   buzzerChirpSuccess();
   openGate();
-
-  // Immediate LCD update
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("TREAT DISPENSE!");
-  lcd.setCursor(0, 1);
-  lcd.print("Open: ");
-  lcd.print(activeDurationMs);
-  lcd.print("ms");
 
   return true;
 }
 
 void publishFeedEvent(bool completed) {
-  if (!mqttClient.connected()) return;
+  if (!mqttClient.connected()) {
+    Serial.println(F("[MQTT] ⚠️ Cannot publish feed event: MQTT not connected"));
+    return;
+  }
 
   char topic[64];
   snprintf(topic, sizeof(topic), "feeders/%s/event/feed", deviceId);
@@ -336,7 +343,10 @@ void publishFeedEvent(bool completed) {
 
   char buffer[256];
   serializeJson(doc, buffer);
-  mqttClient.publish(topic, buffer, true);
+  Serial.printf("[MQTT] 📤 Publishing feed event to %s\n", topic);
+  Serial.printf("       Payload: %s\n", buffer);
+  bool pubOk = mqttClient.publish(topic, buffer, true);
+  Serial.printf("[MQTT] Event publish result: %s\n", pubOk ? "SUCCESS ✅" : "FAILED ❌");
 }
 
 void updateDispenseEngine() {
@@ -350,12 +360,14 @@ void updateDispenseEngine() {
       lastDispenseEndTime = millis();
       currentState = STATE_COOLDOWN;
 
-      // Publish event over MQTT
+      Serial.println(F("[Feeder] ✅ Dispense completed! Gate closed."));
+      // Publish event over MQTT so backend records it in database & notifies Telegram
       publishFeedEvent(true);
     }
   } else if (currentState == STATE_COOLDOWN) {
     if (now - lastDispenseEndTime >= COOLDOWN_MS) {
       currentState = STATE_IDLE;
+      Serial.println(F("[Feeder] Ready for next feeding operation."));
     }
   }
 }
@@ -388,6 +400,11 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   memcpy(message, payload, length);
   message[length] = '\0';
 
+  Serial.printf("\n==================================================\n");
+  Serial.printf("[MQTT IN] 📩 Topic: %s\n", topic);
+  Serial.printf("[MQTT IN] Payload: %s\n", message);
+  Serial.printf("==================================================\n");
+
   char feedCmdTopic[64];
   char configTopic[64];
   char syncCmdTopic[64];
@@ -395,14 +412,17 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   snprintf(configTopic, sizeof(configTopic), "feeders/%s/config/desired", deviceId);
   snprintf(syncCmdTopic, sizeof(syncCmdTopic), "feeders/%s/cmd/sync", deviceId);
 
-  // 1. Remote Manual Feed Command
+  // 1. Remote Manual Feed Command (Triggered from Telegram Mini App / WebApp)
   if (strcmp(topic, feedCmdTopic) == 0) {
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, message);
     if (!error) {
       const char* cmdId = doc["commandId"] | "";
       uint16_t duration = doc["durationMs"] | DEFAULT_DURATION_MS;
+      Serial.printf("[MQTT IN] ✅ Feed command parsed: %d ms, cmdId: '%s'\n", duration, cmdId);
       startDispense(duration, "manual_app", cmdId);
+    } else {
+      Serial.printf("[MQTT IN] ❌ JSON Deserialization error: %s\n", error.c_str());
     }
   }
   // 2. Schedule & Desired Configuration Sync
@@ -417,11 +437,12 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         schedules[scheduleCount].enabled = s["enabled"] | true;
         schedules[scheduleCount].hour = s["hour"] | 12;
         schedules[scheduleCount].minute = s["minute"] | 0;
-        schedules[scheduleCount].durationMs = s["durationMs"] | 700;
+        schedules[scheduleCount].durationMs = s["durationMs"] | DEFAULT_DURATION_MS;
         const char* lbl = s["label"] | "Routine";
         strncpy(schedules[scheduleCount].label, lbl, sizeof(schedules[scheduleCount].label) - 1);
         scheduleCount++;
       }
+      Serial.printf("[MQTT IN] ✅ Synced %d feeding schedules from cloud\n", scheduleCount);
     }
   }
 }
@@ -432,10 +453,18 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
 void reconnectMqtt() {
   if (mqttClient.connected()) return;
 
+  static unsigned long lastMqttAttempt = 0;
+  if (millis() - lastMqttAttempt < 5000) return; // Non-blocking: try at most once every 5 seconds
+  lastMqttAttempt = millis();
+
   char availabilityTopic[64];
   snprintf(availabilityTopic, sizeof(availabilityTopic), "feeders/%s/availability", deviceId);
 
+  Serial.printf("[MQTT] Connecting to %s:%d (Client ID: '%s')...\n", MQTT_SERVER, MQTT_PORT, deviceId);
+  Serial.flush();
+
   if (mqttClient.connect(deviceId, MQTT_USER, MQTT_PASS, availabilityTopic, 1, true, "offline")) {
+    Serial.println(F("✅ [MQTT] Connected to MQTT Broker successfully!"));
     mqttClient.publish(availabilityTopic, "online", true);
 
     char feedCmdTopic[64];
@@ -443,8 +472,11 @@ void reconnectMqtt() {
     snprintf(feedCmdTopic, sizeof(feedCmdTopic), "feeders/%s/cmd/feed", deviceId);
     snprintf(configTopic, sizeof(configTopic), "feeders/%s/config/desired", deviceId);
 
-    mqttClient.subscribe(feedCmdTopic);
-    mqttClient.subscribe(configTopic);
+    mqttClient.subscribe(feedCmdTopic, 1);
+    mqttClient.subscribe(configTopic, 1);
+    Serial.printf("[MQTT] Subscribed to:\n  -> %s\n  -> %s\n", feedCmdTopic, configTopic);
+  } else {
+    Serial.printf("[MQTT] ❌ Connect failed, rc=%d (Will retry in 5s)\n", mqttClient.state());
   }
 }
 
@@ -468,10 +500,27 @@ int getNextScheduleIndex(FeederDateTime dt) {
 }
 
 // ----------------------------------------------------------------------------
-// LCD DISPLAY UPDATE
+// LCD DISPLAY UPDATE (Real-Time Live Dynamic Countdown!)
 // ----------------------------------------------------------------------------
 void updateLcd(FeederDateTime dt) {
-  if (currentState == STATE_DISPENSING) return; // Dispense UI has priority
+  unsigned long now = millis();
+
+  // 1. Live Dynamic Dispense UI (Counts down in real-time!)
+  if (currentState == STATE_DISPENSING) {
+    unsigned long elapsed = now - dispenseStartTime;
+    unsigned long remainingSec = (activeDurationMs > elapsed) ? (activeDurationMs - elapsed + 999) / 1000 : 0;
+
+    char line1[17];
+    char line2[17];
+    snprintf(line1, sizeof(line1), "DISPENSING FOOD!");
+    snprintf(line2, sizeof(line2), "Remaining: %2lus", remainingSec);
+
+    lcd.setCursor(0, 0);
+    lcd.print(line1);
+    lcd.setCursor(0, 1);
+    lcd.print(line2);
+    return;
+  }
 
   char line1[17];
   char rawLine1[17];
@@ -536,18 +585,15 @@ void setup() {
   // 3. Initialize DS3231 RTC on I2C
   rtcInit();
 
-  // 4. Initialize Servo with PWM Timer Allocation & Sleep State
-  Serial.println(F("[Servo] Allocating PWM timers & configuring 50Hz..."));
+  // 4. Initialize Servo with Dedicated Timer 0
+  Serial.println(F("[Servo] Configuring 50Hz PWM timer & attaching to GPIO 19..."));
   Serial.flush();
   ESP32PWM::allocateTimer(0);
-  ESP32PWM::allocateTimer(1);
-  ESP32PWM::allocateTimer(2);
-  ESP32PWM::allocateTimer(3);
   foodServo.setPeriodHertz(50);
-  Serial.println(F("[Servo] Calibrating dispenser gate to closed position..."));
-  Serial.flush();
-  closeGate(); // Attaches, writes 0°, waits 300ms, detaches
-  Serial.println(F("[Servo] Gate secured closed. Servo motor asleep (0mA idle)."));
+  foodServo.attach(PIN_SERVO, 500, 2400);
+  foodServo.write(SERVO_CLOSED_ANGLE);
+  delay(400); // Allow physical arm to settle at closed position (0°)
+  Serial.println(F("[Servo] Gate calibrated closed (0°). Ready for operation."));
   Serial.flush();
 
   // 5. Feeding Schedules: Initialized with 0 schedules until configured via app
@@ -684,8 +730,9 @@ void loop() {
   // 4. Update Servo Actuation Engine
   updateDispenseEngine();
 
-  // 5. Periodic LCD Refresh (every 500ms)
-  if (now - lastLcdUpdate >= 500) {
+  // 5. Periodic LCD Refresh (every 250ms during dispense, 500ms when idle)
+  unsigned long lcdInterval = (currentState == STATE_DISPENSING) ? 250 : 500;
+  if (now - lastLcdUpdate >= lcdInterval) {
     lastLcdUpdate = now;
     updateLcd(nowDt);
   }

@@ -59,8 +59,11 @@ export class DevicesController {
   }
 
   @Get(':id/members')
-  async getDeviceMembers(@Param('id') id: string) {
-    return this.devicesService.getDeviceMembers(id);
+  async getDeviceMembers(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.devicesService.getDeviceMembers(id, user);
   }
 
   @Post(':id/invite')

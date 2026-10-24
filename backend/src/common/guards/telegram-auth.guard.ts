@@ -26,16 +26,20 @@ export class TelegramAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
     
+    const tgUserId = request.headers['x-telegram-user-id'] as string;
+    const tgUserName = request.headers['x-telegram-user-name'] as string;
+    const tgUsername = request.headers['x-telegram-username'] as string;
+
     // 1. Check if forwarded from our secure Next.js Security BFF
     const bffHeader = request.headers['x-bff-source'];
     if (bffHeader === 'NextJS-AppRouter') {
-      const authHeader = request.headers['authorization'];
-      // Extract subject from bearer or assign default authorized owner
+      const realId = tgUserId ? `tg_${tgUserId}` : 'owner_bff_user';
+      const realName = tgUserName || 'Feeder Owner';
       (request as unknown as { user: AuthenticatedUser }).user = {
-        id: 'owner_bff_user',
-        telegramId: 999888777,
-        username: 'alex_companion',
-        firstName: 'Alex & Mochi',
+        id: realId,
+        telegramId: tgUserId ? Number(tgUserId) : undefined,
+        username: tgUsername || undefined,
+        firstName: realName,
         role: 'owner',
       };
       return true;
