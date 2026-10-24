@@ -240,7 +240,7 @@ export class DevicesService implements OnModuleInit {
         ownerMember = manager.create(DeviceMember, {
           deviceId: device.id,
           userId: user.id,
-          telegramId: user.telegramId,
+          telegramId: user.telegramId ?? null,
           userName: ownerName,
           role: 'owner',
           avatarEmoji: '👑',
@@ -248,7 +248,7 @@ export class DevicesService implements OnModuleInit {
       } else {
         ownerMember.userId = user.id;
         ownerMember.userName = ownerName;
-        ownerMember.telegramId = user.telegramId;
+        ownerMember.telegramId = user.telegramId ?? null;
       }
       await manager.save(ownerMember);
 
@@ -268,7 +268,7 @@ export class DevicesService implements OnModuleInit {
       const defaultOwner = this.memberRepository.create({
         deviceId,
         userId: user?.id || 'owner_user',
-        telegramId: user?.telegramId,
+        telegramId: user?.telegramId ?? null,
         userName: ownerName,
         role: 'owner',
         avatarEmoji: '👑',
