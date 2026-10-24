@@ -85,6 +85,7 @@ export function useDeviceMembers(deviceId: string) {
         headers: {
           'Content-Type': 'application/json',
           'x-bff-source': 'NextJS-AppRouter',
+          ...getTelegramAuthHeaders(),
         },
         body: JSON.stringify({ role }),
       });
@@ -96,7 +97,7 @@ export function useDeviceMembers(deviceId: string) {
 
     // Fallback if offline
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const inviteToken = `join_${deviceId}_${role}_${randomSuffix}`;
+    const inviteToken = `join--${deviceId}--${role}--${randomSuffix}`;
     return {
       success: true,
       deviceId,

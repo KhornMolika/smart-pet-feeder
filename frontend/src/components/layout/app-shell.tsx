@@ -5,7 +5,7 @@ import { useFeederContext } from '@/context/feeder-context';
 import { Header } from '@/components/common/header';
 import { BottomNav } from '@/components/common/bottom-nav';
 import { AddDeviceModal } from '@/components/devices/add-device-modal';
-import { getTelegramWebApp, getTelegramStartParam, triggerNotificationHaptic } from '@/lib/utils/telegram.util';
+import { getTelegramWebApp, getTelegramStartParam, triggerNotificationHaptic, getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
 import { getBackendApiUrl } from '@/lib/api-config';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -54,13 +54,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setClaimToken(formattedToken);
       setIsAddDeviceOpen(true);
       triggerNotificationHaptic('success');
-    } else if (startParam.startsWith('join_')) {
+    } else if (startParam.startsWith('join_') || startParam.startsWith('join--')) {
       // Auto-join shared feeder via invitation token
       fetch(`${getBackendApiUrl()}/api/v1/devices/join`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-bff-source': 'NextJS-AppRouter',
+          ...getTelegramAuthHeaders(),
         },
         body: JSON.stringify({ inviteToken: startParam }),
       })

@@ -35,6 +35,17 @@ export class DevicesService implements OnModuleInit {
     // Seed default feeder device for development/testing if database is fresh
     await this.ensureDefaultDevice('feeder_esp32_01');
 
+    // Clean up phantom devices created by previous split('_') bug
+    try {
+      await this.dataSource.query(`DELETE FROM device_members WHERE device_id IN ('feeder', 'feeder_esp32_feeder_e')`);
+      await this.dataSource.query(`DELETE FROM device_settings WHERE device_id IN ('feeder', 'feeder_esp32_feeder_e')`);
+      await this.dataSource.query(`DELETE FROM feeding_schedules WHERE device_id IN ('feeder', 'feeder_esp32_feeder_e')`);
+      await this.dataSource.query(`DELETE FROM feeding_events WHERE device_id IN ('feeder', 'feeder_esp32_feeder_e')`);
+      await this.dataSource.query(`DELETE FROM devices WHERE id IN ('feeder', 'feeder_esp32_feeder_e')`);
+    } catch {
+      // Ignore if table or records don't exist
+    }
+
     // Seed factory demo QR feeder device ready for deep link scanning test
     await this.ensureFactoryDemoDevice('feeder_esp32_qr_demo', 'claim_cc8a2f_9x7k2q');
 
@@ -288,7 +299,8 @@ export class DevicesService implements OnModuleInit {
   async createInvite(deviceId: string, dto: CreateInviteDto, user: AuthenticatedUser) {
     const device = await this.getDevice(deviceId);
     const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const inviteToken = `join_${device.id}_${dto.role}_${randomSuffix}`;
+    // Use '--' delimiter so device IDs containing underscores (e.g. feeder_esp32_01) remain completely intact
+    const inviteToken = `join--${device.id}--${dto.role}--${randomSuffix}`;
     const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ChinChemBot';
     const inviteUrl = `https://t.me/${botUsername}/app?startapp=${inviteToken}`;
 
@@ -304,9 +316,41 @@ export class DevicesService implements OnModuleInit {
   }
 
   async joinDevice(dto: JoinDeviceDto, user: AuthenticatedUser): Promise<DeviceMember> {
-    const parts = dto.inviteToken.split('_');
-    const deviceId = parts[1] || 'feeder_esp32_01';
-    const role = (parts[2] as 'owner' | 'family' | 'guest') || 'family';
+    let deviceId = 'feeder_esp32_01';
+    let role: 'owner' | 'family' | 'guest' = 'family';
+
+    if (dto.inviteToken.includes('--')) {
+      const parts = dto.inviteToken.split('--');
+      // Format: join--deviceId--role--suffix
+      if (parts.length >= 2) {
+        deviceId = parts[1];
+        if (parts[2] && ['owner', 'family', 'guest'].includes(parts[2])) {
+          role = parts[2] as 'owner' | 'family' | 'guest';
+        }
+      }
+    } else {
+      // Robust regex for legacy join_<deviceId>_<role>_<suffix> where deviceId can contain underscores
+      const match = dto.inviteToken.match(/^join_(.+?)_(owner|family|guest)(?:_([a-zA-Z0-9]+))?$/);
+      if (match) {
+        deviceId = match[1];
+        role = match[2] as 'owner' | 'family' | 'guest';
+      } else {
+        const parts = dto.inviteToken.split('_');
+        if (parts[1] === 'feeder' && parts[2] === 'esp32' && parts[3] === '01') {
+          deviceId = 'feeder_esp32_01';
+          if (parts[4] && ['owner', 'family', 'guest'].includes(parts[4])) {
+            role = parts[4] as 'owner' | 'family' | 'guest';
+          }
+        } else if (parts[1]) {
+          deviceId = parts[1];
+        }
+      }
+    }
+
+    // Safety guard: prevent phantom device id 'feeder'
+    if (deviceId === 'feeder') {
+      deviceId = 'feeder_esp32_01';
+    }
 
     const device = await this.getDevice(deviceId);
 
@@ -318,11 +362,13 @@ export class DevicesService implements OnModuleInit {
       return member;
     }
 
+    const memberName = dto.userName || user.firstName || user.username || 'Family Member';
+
     member = this.memberRepository.create({
       deviceId: device.id,
       userId: user.id || 'new_member',
       telegramId: user.telegramId || null,
-      userName: dto.userName || user.firstName || user.username || 'Family Member',
+      userName: memberName,
       role,
       avatarEmoji: role === 'guest' ? '🐾' : '👤',
     });
@@ -361,7 +407,7 @@ export class DevicesService implements OnModuleInit {
       .leftJoinAndSelect('device.settings', 'settings');
 
     if (memberDeviceIds.length > 0) {
-      qb.where('device.ownerId = :userId OR device.id IN (:...memberDeviceIds)', {
+      qb.where('(device.ownerId = :userId OR device.id IN (:...memberDeviceIds))', {
         userId: user.id,
         memberDeviceIds,
       });
@@ -369,8 +415,8 @@ export class DevicesService implements OnModuleInit {
       qb.where('device.ownerId = :userId', { userId: user.id });
     }
 
-    // Always include default feeder if owned by default owner
-    qb.orWhere('device.ownerId = :defaultOwner', { defaultOwner: 'owner_bff_user' });
+    // Always include the primary hardware feeder feeder_esp32_01
+    qb.orWhere('device.id = :defaultHardwareId', { defaultHardwareId: 'feeder_esp32_01' });
 
     qb.orderBy('device.createdAt', 'ASC');
 
@@ -385,12 +431,15 @@ export class DevicesService implements OnModuleInit {
   }
 
   async getDevice(id: string): Promise<Device> {
-    let device = await this.deviceRepository.findOne({
+    const device = await this.deviceRepository.findOne({
       where: { id },
       relations: { settings: true },
     });
     if (!device) {
-      device = await this.ensureDefaultDevice(id);
+      if (id === 'feeder_esp32_01') {
+        return this.ensureDefaultDevice('feeder_esp32_01');
+      }
+      throw new NotFoundException(`Feeder device '${id}' not found`);
     }
     return device;
   }

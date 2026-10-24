@@ -6,7 +6,7 @@ import { INITIAL_DEVICES, DEMO_DEVICES, DEFAULT_PORTION_PRESETS } from '@/lib/co
 
 import { getBackendApiUrl } from '@/lib/api-config';
 import { getTelegramAuthHeaders } from '@/lib/utils/telegram.util';
-import { isSameDeviceId } from '@/lib/utils/device.util';
+import { isSameDeviceId, toHardwareDeviceId } from '@/lib/utils/device.util';
 
 const STORAGE_KEY_DEVICES = 'chinchum_fleet_devices';
 const STORAGE_KEY_ACTIVE_ID = 'chinchum_active_device_id';
@@ -27,16 +27,16 @@ export function useFeederFleet() {
           const deduped: FeederDevice[] = [];
 
           for (const d of parsed) {
-            // Priority 1: Hardware Claim Token
-            const tokenKey = d.claimToken
-              ? d.claimToken.replace(/^claim_/, '').toLowerCase()
-              : null;
-            // Priority 2: Device ID
-            const idKey = d.id ? d.id.toLowerCase() : null;
-            // Priority 3: Fallback combination of Pet Name + Room
-            const fallbackKey = `${(d.petName || 'mochi').toLowerCase().trim()}_${(d.room || 'living room').toLowerCase().trim()}`;
+            // Prune phantom devices created by legacy split bugs
+            if (d.id === 'feeder' || d.id === 'feeder_esp32_feeder_e') {
+              continue;
+            }
 
-            const primaryKey = tokenKey || idKey || fallbackKey;
+            // Normalized Hardware Key
+            const hwKey = toHardwareDeviceId(d.id, d.claimToken);
+            // Fallback combination of Pet Name + Room
+            const fallbackKey = `${(d.petName || 'mochi').toLowerCase().trim()}_${(d.room || 'living room').toLowerCase().trim()}`;
+            const primaryKey = hwKey || fallbackKey;
 
             if (seenKeys.has(primaryKey)) {
               continue; // Prune redundant duplicate
@@ -57,7 +57,7 @@ export function useFeederFleet() {
           if (storedActiveId && finalDevices.some((d: FeederDevice) => d.id === storedActiveId)) {
             setActiveDeviceId(storedActiveId);
           } else {
-            setActiveDeviceId(finalDevices[0].id);
+            setActiveDeviceId(finalDevices[0]?.id || '');
           }
           return;
         }
@@ -76,9 +76,14 @@ export function useFeederFleet() {
         if (res.ok) {
           const backendList = await res.json();
           if (Array.isArray(backendList) && backendList.length > 0 && isSubscribed) {
+            // Filter out phantom devices
+            const validBackend = backendList.filter(
+              (d: any) => d.id !== 'feeder' && d.id !== 'feeder_esp32_feeder_e'
+            );
+
             setDevices((currentLocalDevices) => {
               // Convert backend records into FeederDevice
-              const mappedBackend: FeederDevice[] = backendList.map((d: any) => ({
+              const mappedBackend: FeederDevice[] = validBackend.map((d: any) => ({
                 id: d.id,
                 name: d.name || `${d.petName || 'Mochi'}'s Feeder`,
                 petName: d.petName || 'Mochi',
@@ -100,8 +105,15 @@ export function useFeederFleet() {
 
               // Merge: backend is authoritative for device list and pet properties
               const mergedMap = new Map<string, FeederDevice>();
+              const seenHardwareIds = new Set<string>();
 
               for (const bd of mappedBackend) {
+                const hwId = toHardwareDeviceId(bd.id, bd.claimToken);
+                if (seenHardwareIds.has(hwId)) {
+                  continue;
+                }
+                seenHardwareIds.add(hwId);
+
                 const existing = currentLocalDevices.find((ld) => isSameDeviceId(ld.id, bd.id));
                 if (existing) {
                   mergedMap.set(bd.id, {
@@ -117,8 +129,13 @@ export function useFeederFleet() {
 
               // Preserve any active local claimed devices if not returned yet
               for (const ld of currentLocalDevices) {
+                if (ld.id === 'feeder' || ld.id === 'feeder_esp32_feeder_e') continue;
+                const hwId = toHardwareDeviceId(ld.id, ld.claimToken);
+                if (seenHardwareIds.has(hwId)) continue;
+
                 if (!Array.from(mergedMap.keys()).some((k) => isSameDeviceId(k, ld.id))) {
                   if (ld.claimToken) {
+                    seenHardwareIds.add(hwId);
                     mergedMap.set(ld.id, ld);
                   }
                 }
