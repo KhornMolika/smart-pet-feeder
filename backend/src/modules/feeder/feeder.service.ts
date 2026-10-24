@@ -26,6 +26,20 @@ import {
   DEFAULT_SAFETY,
 } from './helpers/feed-safety.helper.js';
 
+function getHardwareDeviceIds(deviceId: string): string[] {
+  const ids = new Set<string>();
+  if (deviceId) {
+    ids.add(deviceId);
+    ids.add(deviceId.replace(/-/g, '_'));
+    ids.add(deviceId.replace(/_001$/, '_01'));
+    ids.add(deviceId.replace(/-001$/, '_01'));
+    ids.add(deviceId.replace(/^claim_/, ''));
+  }
+  // Guarantee physical hardware default receives command
+  ids.add('feeder_esp32_01');
+  return Array.from(ids).filter(Boolean);
+}
+
 @Injectable()
 export class FeederService implements OnModuleInit {
   private readonly logger = new Logger(FeederService.name);
@@ -142,22 +156,15 @@ export class FeederService implements OnModuleInit {
       });
       await manager.save(event);
 
-      // 4. Publish feed command to ESP32 over MQTT
+      // 4. Publish feed command to ESP32 over MQTT (broadcast to all alias topics)
+      const targetHardwareIds = getHardwareDeviceIds(deviceId);
       this.logger.log(
-        `[FeederService] 🍽️ Triggering feed command for ${deviceId}: ${boundsCheck.clampedDuration}ms (Requested by: ${requestedBy})`,
+        `[FeederService] 🍽️ Triggering feed command for ${deviceId} -> target hardware IDs: [${targetHardwareIds.join(', ')}] (${boundsCheck.clampedDuration}ms, Requested by: ${requestedBy})`,
       );
 
-      this.mqttService.publishFeedCommand(
-        deviceId,
-        command.id,
-        boundsCheck.clampedDuration,
-      );
-
-      // Publish to normalized hardware ID if different (e.g. feeder-esp32-01 -> feeder_esp32_01)
-      const normalizedHardwareId = deviceId.replace(/^feeder-/, 'feeder_').replace(/_001$/, '_01');
-      if (normalizedHardwareId !== deviceId) {
+      for (const hId of targetHardwareIds) {
         this.mqttService.publishFeedCommand(
-          normalizedHardwareId,
+          hId,
           command.id,
           boundsCheck.clampedDuration,
         );
@@ -203,18 +210,13 @@ export class FeederService implements OnModuleInit {
    * Immediately stops active food dispensing on the ESP32 hardware and closes the servo gate.
    */
   async stopFeed(deviceId: string, requestedBy: string = 'bff_owner') {
+    const targetHardwareIds = getHardwareDeviceIds(deviceId);
     this.logger.log(
-      `[FeederService] 🛑 Stop feed command for ${deviceId} (Requested by: ${requestedBy})`,
+      `[FeederService] 🛑 Stop feed command for ${deviceId} -> target hardware IDs: [${targetHardwareIds.join(', ')}] (Requested by: ${requestedBy})`,
     );
 
-    this.mqttService.publishStopCommand(deviceId);
-
-    // Publish to normalized hardware ID if different (e.g. feeder-esp32-01 -> feeder_esp32_01)
-    const normalizedHardwareId = deviceId
-      .replace(/^feeder-/, 'feeder_')
-      .replace(/_001$/, '_01');
-    if (normalizedHardwareId !== deviceId) {
-      this.mqttService.publishStopCommand(normalizedHardwareId);
+    for (const hId of targetHardwareIds) {
+      this.mqttService.publishStopCommand(hId);
     }
 
     return {
@@ -230,14 +232,15 @@ export class FeederService implements OnModuleInit {
   // SCHEDULES
   // --------------------------------------------------------------------------
   async getSchedules(deviceId: string): Promise<FeedingSchedule[]> {
+    const targetHardwareIds = getHardwareDeviceIds(deviceId);
     let schedules = await this.scheduleRepository.find({
-      where: { deviceId },
+      where: targetHardwareIds.map((id) => ({ deviceId: id })),
       order: { timeLocal: 'ASC' },
     });
     if (schedules.length === 0) {
       await this.seedDefaultSchedules(deviceId);
       schedules = await this.scheduleRepository.find({
-        where: { deviceId },
+        where: targetHardwareIds.map((id) => ({ deviceId: id })),
         order: { timeLocal: 'ASC' },
       });
     }
@@ -298,9 +301,15 @@ export class FeederService implements OnModuleInit {
       };
     });
 
-    this.mqttService.publishDesiredConfig(deviceId, {
-      schedules: compactSchedules,
-    });
+    const targetHardwareIds = getHardwareDeviceIds(deviceId);
+    for (const hId of targetHardwareIds) {
+      this.mqttService.publishDesiredConfig(hId, {
+        schedules: compactSchedules,
+      });
+    }
+    this.logger.log(
+      `[FeederService] ⏰ Synced ${compactSchedules.length} schedule(s) to MQTT hardware IDs: [${targetHardwareIds.join(', ')}]`,
+    );
   }
 
   // --------------------------------------------------------------------------

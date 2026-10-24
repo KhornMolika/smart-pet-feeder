@@ -440,15 +440,15 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   snprintf(configTopic, sizeof(configTopic), "feeders/%s/config/desired", deviceId);
   snprintf(syncCmdTopic, sizeof(syncCmdTopic), "feeders/%s/cmd/sync", deviceId);
 
-  // 1. Remote Stop Command (Triggered from WebApp / Telegram)
-  if (strcmp(topic, stopCmdTopic) == 0) {
+  // 1. Remote Stop Command (Check exact topic OR wildcard suffix)
+  if (strcmp(topic, stopCmdTopic) == 0 || strstr(topic, "/cmd/stop") != NULL) {
     Serial.println(F("[MQTT IN] 🛑 Received STOP command from cloud"));
     stopDispense("app_stop");
     return;
   }
 
-  // 2. Remote Manual Feed Command (Triggered from Telegram Mini App / WebApp)
-  if (strcmp(topic, feedCmdTopic) == 0) {
+  // 2. Remote Manual Feed Command (Check exact topic OR wildcard suffix)
+  if (strcmp(topic, feedCmdTopic) == 0 || strstr(topic, "/cmd/feed") != NULL) {
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, message);
     if (!error) {
@@ -466,9 +466,9 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
       Serial.printf("[MQTT IN] ❌ JSON Deserialization error: %s\n", error.c_str());
     }
   }
-  // 2. Schedule & Desired Configuration Sync
-  else if (strcmp(topic, configTopic) == 0) {
-    StaticJsonDocument<512> doc;
+  // 3. Schedule & Desired Configuration Sync (Check exact topic OR wildcard suffix)
+  else if (strcmp(topic, configTopic) == 0 || strstr(topic, "/config/desired") != NULL) {
+    StaticJsonDocument<768> doc;
     DeserializationError error = deserializeJson(doc, message);
     if (!error && doc.containsKey("schedules")) {
       JsonArray schedArr = doc["schedules"].as<JsonArray>();
@@ -483,7 +483,13 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         strncpy(schedules[scheduleCount].label, lbl, sizeof(schedules[scheduleCount].label) - 1);
         scheduleCount++;
       }
-      Serial.printf("[MQTT IN] ✅ Synced %d feeding schedules from cloud\n", scheduleCount);
+      Serial.printf("[MQTT IN] ✅ Synced %d feeding schedule(s) from cloud!\n", scheduleCount);
+      for (int i = 0; i < scheduleCount; i++) {
+        Serial.printf("   - Alarm #%d: %02d:%02d (%u ms, %s)\n",
+                      i + 1, schedules[i].hour, schedules[i].minute, schedules[i].durationMs, schedules[i].label);
+      }
+    } else if (error) {
+      Serial.printf("[MQTT IN] ❌ Schedule JSON Deserialization error: %s\n", error.c_str());
     }
   }
 }
@@ -518,7 +524,14 @@ void reconnectMqtt() {
     mqttClient.subscribe(feedCmdTopic, 1);
     mqttClient.subscribe(stopCmdTopic, 1);
     mqttClient.subscribe(configTopic, 1);
-    Serial.printf("[MQTT] Subscribed to:\n  -> %s\n  -> %s\n  -> %s\n", feedCmdTopic, stopCmdTopic, configTopic);
+
+    // Universal wildcard subscriptions: ensures commands from any TMA device variant are received!
+    mqttClient.subscribe("feeders/+/cmd/feed", 1);
+    mqttClient.subscribe("feeders/+/cmd/stop", 1);
+    mqttClient.subscribe("feeders/+/config/desired", 1);
+
+    Serial.printf("[MQTT] Subscribed to:\n  -> %s\n  -> %s\n  -> %s\n  -> feeders/+/cmd/feed\n  -> feeders/+/config/desired\n",
+                  feedCmdTopic, stopCmdTopic, configTopic);
   } else {
     Serial.printf("[MQTT] ❌ Connect failed, rc=%d (Will retry in 5s)\n", mqttClient.state());
   }

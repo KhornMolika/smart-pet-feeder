@@ -39,8 +39,9 @@ export const DEFAULT_PORTION_PRESETS: PortionPreset[] = [
 
 export const DEMO_DEVICES: FeederDevice[] = [
   {
-    id: 'feeder-esp32-001',
-    name: 'Feeder Pro 1',
+    id: 'feeder_esp32_01',
+    claimToken: 'claim_feeder_esp32_01',
+    name: "Mochi's Feeder",
     petName: 'Mochi',
     petIcon: 'cat',
     petEmoji: 'cat',
@@ -60,7 +61,8 @@ export const DEMO_DEVICES: FeederDevice[] = [
     groupGuestFeedAllowed: true,
   },
   {
-    id: 'feeder-esp32-002',
+    id: 'feeder_esp32_02',
+    claimToken: 'claim_feeder_esp32_02',
     name: 'Feeder Pro 2',
     petName: 'Max',
     petIcon: 'dog',
@@ -88,28 +90,28 @@ export const INITIAL_DEVICES: FeederDevice[] = [];
 export const DEMO_SCHEDULES: FeedingSchedule[] = [
   {
     id: 'sched-1',
-    deviceId: 'feeder-esp32-001',
+    deviceId: 'feeder_esp32_01',
     timeLocal: '07:30',
     daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
-    durationMs: 60000,
+    durationMs: 30000,
     enabled: true,
     label: 'Morning Breakfast',
   },
   {
     id: 'sched-2',
-    deviceId: 'feeder-esp32-001',
+    deviceId: 'feeder_esp32_01',
     timeLocal: '12:30',
     daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
-    durationMs: 30000,
+    durationMs: 15000,
     enabled: true,
     label: 'Noon Snack',
   },
   {
     id: 'sched-3',
-    deviceId: 'feeder-esp32-001',
+    deviceId: 'feeder_esp32_01',
     timeLocal: '18:30',
     daysOfWeek: [1, 2, 3, 4, 5, 6, 0],
-    durationMs: 60000,
+    durationMs: 45000,
     enabled: true,
     label: 'Evening Dinner',
   },

@@ -96,9 +96,10 @@ export function useDeviceFeed(
     setFeedStatus('idle');
     setActuationRemainingMs(0);
 
-    const hardwareDeviceId = activeDevice.claimToken
+    const rawId = activeDevice.claimToken
       ? activeDevice.claimToken.replace(/^claim_/, '')
-      : activeDevice.id.replace(/^feeder-/, 'feeder_').replace(/-([a-zA-Z0-9]+)$/, '_$1');
+      : activeDevice.id || 'feeder_esp32_01';
+    const hardwareDeviceId = rawId.replace(/-/g, '_').replace(/_001$/, '_01');
 
     console.log(`[Stop Feed] Sending stop command to hardware: ${hardwareDeviceId}`);
 
@@ -138,9 +139,10 @@ export function useDeviceFeed(
     setNotificationToast(null);
 
     // Publish MQTT feed command to ESP32 hardware via backend BFF
-    const hardwareDeviceId = activeDevice.claimToken
+    const rawId = activeDevice.claimToken
       ? activeDevice.claimToken.replace(/^claim_/, '')
-      : activeDevice.id.replace(/^feeder-/, 'feeder_').replace(/-([a-zA-Z0-9]+)$/, '_$1');
+      : activeDevice.id || 'feeder_esp32_01';
+    const hardwareDeviceId = rawId.replace(/-/g, '_').replace(/_001$/, '_01');
 
     console.log(`[Feed Now] Sending feed command: device=${hardwareDeviceId}, duration=${duration}ms`);
 

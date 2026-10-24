@@ -51,12 +51,16 @@ export function useDeviceSchedules(deviceId: string) {
     } catch {}
   }, []);
 
+  const targetDeviceId = (deviceId || 'feeder_esp32_01')
+    .replace(/-/g, '_')
+    .replace(/_001$/, '_01');
+
   // 2. Fetch authoritative schedules from NestJS backend API (which automatically syncs with MQTT)
   useEffect(() => {
     let isSubscribed = true;
     async function loadBackendSchedules() {
       try {
-        const res = await fetch(`${backendUrl}/api/v1/devices/${deviceId}/schedules`, {
+        const res = await fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules`, {
           headers: { 'x-bff-source': 'NextJS-AppRouter' },
         });
         if (res.ok) {
@@ -105,7 +109,7 @@ export function useDeviceSchedules(deviceId: string) {
     saveSchedules(updated);
 
     // Sync to backend (which automatically syncs to MQTT on ESP32)
-    fetch(`${backendUrl}/api/v1/devices/${deviceId}/schedules`, {
+    fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -133,7 +137,7 @@ export function useDeviceSchedules(deviceId: string) {
     saveSchedules(updated);
 
     // Sync state change to backend
-    fetch(`${backendUrl}/api/v1/devices/${deviceId}/schedules/${scheduleId}`, {
+    fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +154,7 @@ export function useDeviceSchedules(deviceId: string) {
     saveSchedules(updated);
 
     // Delete on backend
-    fetch(`${backendUrl}/api/v1/devices/${deviceId}/schedules/${scheduleId}`, {
+    fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'DELETE',
       headers: { 'x-bff-source': 'NextJS-AppRouter' },
     }).catch(() => {});
@@ -165,7 +169,7 @@ export function useDeviceSchedules(deviceId: string) {
     saveSchedules(updated);
 
     // Update on backend
-    fetch(`${backendUrl}/api/v1/devices/${deviceId}/schedules/${scheduleId}`, {
+    fetch(`${backendUrl}/api/v1/devices/${targetDeviceId}/schedules/${scheduleId}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

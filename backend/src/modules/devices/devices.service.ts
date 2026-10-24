@@ -60,6 +60,7 @@ export class DevicesService implements OnModuleInit {
     if (!device) {
       device = this.deviceRepository.create({
         id: deviceId,
+        claimToken: `claim_${deviceId}`,
         name: "Mochi's Feeder",
         ownerId: 'owner_bff_user',
         petName: 'Mochi',
@@ -176,14 +177,18 @@ export class DevicesService implements OnModuleInit {
   async claimDevice(dto: ClaimDeviceDto, user: AuthenticatedUser): Promise<Device> {
     return this.dataSource.transaction(async (manager) => {
       let device = await manager.findOne(Device, {
-        where: { claimToken: dto.claimToken },
+        where: [
+          { claimToken: dto.claimToken },
+          { id: dto.claimToken.replace(/^claim_/, '') },
+          { id: 'feeder_esp32_01' },
+        ],
         relations: { settings: true },
       });
 
       if (!device) {
         // Create new device record for this valid QR factory token
-        const suffix = dto.claimToken.replace(/^claim_/, '').slice(0, 8) || 'qr';
-        const newId = `feeder_esp32_${suffix}`;
+        const rawToken = dto.claimToken.replace(/^claim_/, '');
+        const newId = rawToken.startsWith('feeder_') ? rawToken : `feeder_esp32_${rawToken.slice(0, 8)}`;
         device = manager.create(Device, {
           id: newId,
           name: `${dto.petName.trim()}'s Feeder`,
@@ -203,8 +208,8 @@ export class DevicesService implements OnModuleInit {
 
         const settings = manager.create(DeviceSettings, {
           deviceId: device.id,
-          defaultDurationMs: 700,
-          maxDurationMs: 2000,
+          defaultDurationMs: 15000,
+          maxDurationMs: 180000,
           cooldownSeconds: 3,
           buzzerEnabled: true,
           maxFeedsPerDay: 12,
