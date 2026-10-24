@@ -284,7 +284,7 @@ export class DevicesService implements OnModuleInit {
     const device = await this.getDevice(deviceId);
     const randomSuffix = Math.random().toString(36).substring(2, 8);
     const inviteToken = `join_${device.id}_${dto.role}_${randomSuffix}`;
-    const botUsername = 'ChinChemBot';
+    const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'ChinChemBot';
     const inviteUrl = `https://t.me/${botUsername}/app?startapp=${inviteToken}`;
 
     return {
