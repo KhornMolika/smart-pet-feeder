@@ -230,7 +230,7 @@ Every device route checks user ownership/access. Validate Telegram `initData` on
 | 6 — Optional upgrades | Add suitable sensors for low-food/jam detection, OTA |
 
 ## 16. Confirmed decisions and remaining questions
-**Confirmed:** DS1302 RTC (DAT/CLK/RST); SG90 servo flap; no load cell or HX711; time-based dispensing; Telegram Mini App + NestJS + PostgreSQL; MQTT transport.
+**Confirmed:** DS3231 RTC (I2C address 0x68, shared I2C bus with LCD on SDA GPIO 21 / SCL GPIO 22); SG90 servo flap (GPIO 19); no load cell or HX711; time-based dispensing; Telegram Mini App + NestJS + PostgreSQL; MQTT transport.
 
 **Still to confirm:** exact ESP32 board; SG90 gate geometry and calibrated minimum/maximum duration; LCD I²C voltage compatibility; buzzer type; physical power supply; device pairing/provisioning; MQTT deployment; hosting budget; missed-feed policy (default: skip and notify); timezone (default: `Asia/Phnom_Penh`).
 
@@ -244,8 +244,8 @@ Every device route checks user ownership/access. Validate Telegram `initData` on
 **MVP recommendation:** Build and test with a local Mosquitto broker first, but configure `MQTT_HOST`, `MQTT_PORT`, TLS, credentials, and per-device topic prefix via environment/configuration so moving to cloud does not require changing business logic. Keep offline schedules on ESP32 in every option. Do not expose an unauthenticated broker to the public internet.
 
 ## 18. Revised implementation plan
-1. **Hardware:** ESP32 + SG90 servo (external regulated supply), DS1302 (with backup battery), 16×2 I²C LCD, button, buzzer; verify all pin and voltage compatibility.
-2. **Local firmware:** DS1302 time read/validation, LCD time and next feed, button-triggered servo actuation, buzzer, configurable duration with hard safety maximum and cooldown.
+1. **Hardware:** ESP32 + SG90 servo (external regulated supply), DS3231 RTC (I2C address 0x68 with backup battery), 16×2 I²C LCD (0x27), button (GPIO 27), buzzer (GPIO 25); verify all pin and voltage compatibility.
+2. **Local firmware:** DS3231 I2C time read/validation, LCD time and next feed, button-triggered servo actuation, buzzer, configurable duration with hard safety maximum and cooldown.
 3. **Offline scheduling:** persist schedules and executed-occurrence identifiers in ESP32 nonvolatile storage; use RTC to execute once, including across restarts; skip missed feeds by default.
 4. **MQTT integration:** local broker for development; per-device topics, QoS 1, command expiry, idempotency, status/events, reconnect, and broker availability.
 5. **Backend/database:** NestJS validates Telegram identity and device ownership; PostgreSQL stores desired schedules, command records, actuation events, and alerts.
@@ -256,14 +256,14 @@ Every device route checks user ownership/access. Validate Telegram `initData` on
 - A **successful actuation** means firmware completed the commanded servo movement. It does **not** verify food dropped.
 - **Duration (ms)** is the controlled quantity. Small/medium/large presets are experimentally chosen durations, not guaranteed grams.
 - No hopper level, food mass, jam detection, or food-consumption tracking is available without additional hardware.
-- The DS1302 is a 3-wire RTC; the LCD is I²C. They do not share the same bus.
+- The DS3231 is a precision I²C RTC (0x68); the LCD is also I²C (0x27). They share the same physical I2C bus (SDA: GPIO 21, SCL: GPIO 22).
 - RTC backup battery preserves time during power loss, but cannot run the feeder motor; scheduled dispensing resumes only when main power returns.
 
 ## 20. MQTT learning and remote-prototype strategy (updated)
 
 **Decision:** Use two environments with the same device topic contract: (A) **local Eclipse Mosquitto in Docker** for hands-on learning and (B) a **managed cloud MQTT broker** for an internet-accessible prototype. Hosting vendor and long-term budget remain undecided. HiveMQ Cloud is one candidate; check its current trial/pricing and connection limits before selecting it. Self-hosted Mosquitto on a VPS is a later alternative, not the first learning step.
 
-**Architecture:** Telegram Mini App (Next.js) → HTTPS → NestJS API (Telegram init-data verification, authorization, command tracking) → MQTT broker (local or cloud) → ESP32. ESP32 publishes status, actuation events, and alerts through MQTT to NestJS, which persists them in PostgreSQL and sends Telegram bot notifications. The Mini App does **not** connect directly to MQTT or hold broker credentials. Offline feeding is handled by DS1302 + ESP32-persisted schedules independently of MQTT availability.
+**Architecture:** Telegram Mini App (Next.js) → HTTPS → NestJS API (Telegram init-data verification, authorization, command tracking) → MQTT broker (local or cloud) → ESP32. ESP32 publishes status, actuation events, and alerts through MQTT to NestJS, which persists them in PostgreSQL and sends Telegram bot notifications. The Mini App does **not** connect directly to MQTT or hold broker credentials. Offline feeding is handled by DS3231 + ESP32-persisted schedules independently of MQTT availability.
 
 ### 20.1 Hands-on learning labs
 | Lab | Goal | Exercise | Completion check |
@@ -313,27 +313,26 @@ For ESP32 testing on the same Wi-Fi, use the computer's LAN IP (not `localhost`)
 ### 20.3 MQTT topic contract and delivery policy
 | Topic | Publisher → Subscriber | QoS | Retained | Notes |
 |---|---|---:|---|---|
-| `feeder/{id}/cmd/feed` | NestJS → ESP32 | 1 | No | Include unique `commandId`, `durationMs`, `expiresAt`; reject stale/duplicate commands |
-| `feeder/{id}/config/schedule` | NestJS → ESP32 | 1 | Yes | Versioned desired schedule; validate then persist locally and acknowledge version |
-| `feeder/{id}/status/availability` | ESP32 / broker LWT → NestJS | 1 | Yes | ESP32 publishes `online`; broker Last Will publishes `offline` on unexpected disconnect |
-| `feeder/{id}/status/heartbeat` | ESP32 → NestJS | 0 | No | Timestamp, firmware, RTC validity; backend calculates last-seen |
-| `feeder/{id}/event/feeding` | ESP32 → NestJS | 1 | No | Command/schedule ID, source, actuation outcome, timestamp; no weight claim |
-| `feeder/{id}/event/config_ack` | ESP32 → NestJS | 1 | No | Applied schedule version or validation failure |
-| `feeder/{id}/alert/error` | ESP32 → NestJS | 1 | No | RTC error, servo control failure, rejected command, etc. |
+| `feeders/{deviceId}/cmd/feed` | NestJS → ESP32 | 1 | No | Include unique `commandId`, `durationMs`, `expiresAt`; reject stale/duplicate commands |
+| `feeders/{deviceId}/cmd/stop` | NestJS → ESP32 | 1 | No | Immediate emergency stop; closes servo gate to 0° |
+| `feeders/{deviceId}/config/desired` | NestJS → ESP32 | 1 | Yes | Versioned desired schedule & portion config; persisted in ESP32 RAM/NVS |
+| `feeders/{deviceId}/availability` | ESP32 / broker LWT → NestJS | 1 | Yes | ESP32 publishes `online`; broker Last Will publishes `offline` on unexpected disconnect |
+| `feeders/{deviceId}/state` | ESP32 → NestJS | 0 | No | Periodic telemetry (every 10s): `state`, `uptimeSeconds`, `rtcValid`, `rtcTime` |
+| `feeders/{deviceId}/event/feed` | ESP32 → NestJS | 1 | No | Event ID, source (`manual_app`, `button`, `schedule`), duration, status (`completed`/`interrupted`) |
+| `feeders/{deviceId}/alert` | ESP32 → NestJS | 1 | No | RTC error, servo control failure, rejected command, etc. |
 
 **Example command:**
 ```json
 {
   "commandId": "b7d8a6e0-1b1d-4a56-92fd-40bbecb193aa",
-  "durationMs": 700,
-  "issuedAt": "2026-10-13T14:00:00Z",
-  "expiresAt": "2026-10-13T14:00:15Z"
+  "durationMs": 15000,
+  "expiresAt": "2026-10-25T04:00:15Z"
 }
 ```
 The duration above is illustrative, **not** a recommended servo timing; calibrate the mechanism and enforce hard firmware bounds. Commands must never be retained. ESP32 should persist recently executed command IDs and schedule-occurrence IDs to avoid accidental double feeding after a reboot or reconnect. Expired commands are rejected only when the device has a valid time source; otherwise fail closed for remote feed commands.
 
 ### 20.4 Disconnected-device rules
-1. **Wi-Fi/broker loss:** local DS1302 schedule and button remain operational, subject to safety rules; queue bounded actuation events in persistent storage for later reconciliation.
+1. **Wi-Fi/broker loss:** local DS3231 schedule and button remain operational, subject to safety rules; queue bounded actuation events in persistent storage for later reconciliation.
 2. **Unexpected disconnect:** MQTT Last Will marks availability offline; backend also uses heartbeat timeouts because LWT delivery may be delayed or unavailable during wider outages.
 3. **Reconnection:** use backoff with jitter, resubscribe, reconcile desired schedule version, and upload queued events; do not automatically execute missed remote feed commands.
 4. **Duplicate delivery:** MQTT QoS 1 may redeliver; command and event handlers must be idempotent.
