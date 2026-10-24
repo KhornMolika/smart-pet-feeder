@@ -82,7 +82,7 @@ export class FeederService implements OnModuleInit {
             label: 'Breakfast Crunch',
             timeLocal: '07:30',
             daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-            durationMs: 700,
+            durationMs: 30000,
             enabled: true,
             version: 1,
           }),
@@ -91,7 +91,7 @@ export class FeederService implements OnModuleInit {
             label: 'Dinner Feast',
             timeLocal: '18:00',
             daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
-            durationMs: 700,
+            durationMs: 45000,
             enabled: true,
             version: 1,
           }),
@@ -251,13 +251,14 @@ export class FeederService implements OnModuleInit {
     deviceId: string,
     dto: CreateScheduleDto,
   ): Promise<FeedingSchedule> {
+    const targetId = 'feeder_esp32_01';
     const schedule = this.scheduleRepository.create({
-      deviceId,
+      deviceId: targetId,
       ...dto,
       version: 1,
     });
     const saved = await this.scheduleRepository.save(schedule);
-    await this.syncSchedulesToMqtt(deviceId);
+    await this.syncSchedulesToMqtt(targetId);
     return saved;
   }
 
@@ -266,9 +267,13 @@ export class FeederService implements OnModuleInit {
     id: string,
     dto: UpdateScheduleDto,
   ): Promise<FeedingSchedule> {
-    const schedule = await this.scheduleRepository.findOne({
-      where: { id, deviceId },
+    const targetHardwareIds = getHardwareDeviceIds(deviceId);
+    let schedule = await this.scheduleRepository.findOne({
+      where: targetHardwareIds.map((hId) => ({ id, deviceId: hId })),
     });
+    if (!schedule) {
+      schedule = await this.scheduleRepository.findOne({ where: { id } });
+    }
     if (!schedule) {
       throw new NotFoundException(`Schedule ${id} not found`);
     }
@@ -281,9 +286,17 @@ export class FeederService implements OnModuleInit {
   }
 
   async deleteSchedule(deviceId: string, id: string): Promise<void> {
-    const result = await this.scheduleRepository.delete({ id, deviceId });
-    if (result.affected === 0) {
-      throw new NotFoundException(`Schedule ${id} not found`);
+    const targetHardwareIds = getHardwareDeviceIds(deviceId);
+    let schedule = await this.scheduleRepository.findOne({
+      where: targetHardwareIds.map((hId) => ({ id, deviceId: hId })),
+    });
+    if (!schedule) {
+      schedule = await this.scheduleRepository.findOne({ where: { id } });
+    }
+    if (schedule) {
+      await this.scheduleRepository.remove(schedule);
+    } else {
+      await this.scheduleRepository.delete({ id });
     }
     await this.syncSchedulesToMqtt(deviceId);
   }
@@ -305,6 +318,7 @@ export class FeederService implements OnModuleInit {
     for (const hId of targetHardwareIds) {
       this.mqttService.publishDesiredConfig(hId, {
         schedules: compactSchedules,
+        defaultDurationMs: 15000,
       });
     }
     this.logger.log(

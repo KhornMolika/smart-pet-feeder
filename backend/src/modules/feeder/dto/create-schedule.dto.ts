@@ -23,9 +23,9 @@ export class CreateScheduleDto {
 
   @IsArray()
   @IsInt({ each: true })
-  @Min(1, { each: true })
+  @Min(0, { each: true })
   @Max(7, { each: true })
-  daysOfWeek: number[] = [1, 2, 3, 4, 5, 6, 7];
+  daysOfWeek: number[] = [0, 1, 2, 3, 4, 5, 6];
 
   @IsInt()
   @Min(200)

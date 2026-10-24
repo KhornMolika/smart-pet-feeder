@@ -23,7 +23,7 @@ export class UpdateScheduleDto {
 
   @IsArray()
   @IsInt({ each: true })
-  @Min(1, { each: true })
+  @Min(0, { each: true })
   @Max(7, { each: true })
   @IsOptional()
   daysOfWeek?: number[];

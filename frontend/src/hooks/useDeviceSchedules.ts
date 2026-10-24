@@ -100,9 +100,10 @@ export function useDeviceSchedules(deviceId: string) {
     .sort((a, b) => a.timeLocal.localeCompare(b.timeLocal));
 
   const addSchedule = (scheduleData: Omit<FeedingSchedule, 'id' | 'deviceId'>) => {
+    const tempId = `sched-${Date.now()}`;
     const newSchedule: FeedingSchedule = {
       ...scheduleData,
-      id: `sched-${Date.now()}`,
+      id: tempId,
       deviceId,
     };
     const updated = [...allSchedules, newSchedule];
@@ -122,7 +123,24 @@ export function useDeviceSchedules(deviceId: string) {
         daysOfWeek: scheduleData.daysOfWeek,
         enabled: scheduleData.enabled ?? true,
       }),
-    }).catch(() => {});
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const saved = await res.json();
+          if (saved && saved.id) {
+            setAllSchedules((prev) => {
+              const mapped = prev.map((s) => (s.id === tempId ? { ...s, id: saved.id } : s));
+              saveSchedules(mapped);
+              return mapped;
+            });
+          }
+        } else {
+          console.error('[Schedule] Failed to save schedule to backend:', res.status);
+        }
+      })
+      .catch((err) => {
+        console.error('[Schedule] Error syncing schedule to backend:', err);
+      });
 
     return newSchedule;
   };

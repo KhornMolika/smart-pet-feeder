@@ -123,7 +123,9 @@ unsigned long lastDebounceTime = 0;
 // Offline Schedules (Persisted in RAM, synced via MQTT config/desired)
 FeedingSchedule schedules[MAX_SCHEDULES];
 uint8_t scheduleCount = 0;
+int lastTriggeredHour = -1;
 int lastTriggeredMinute = -1;
+uint16_t configuredDefaultDurationMs = DEFAULT_DURATION_MS;
 
 // Date/time container used by the feeder logic. The DS3231 library uses its own
 // DateTime class internally; this struct keeps the existing schedule/LCD code simple.
@@ -405,12 +407,15 @@ void checkOfflineSchedules(FeederDateTime dt) {
   if (!dt.valid) return;
   if (currentState != STATE_IDLE) return;
 
-  // Prevent multiple triggers in the same minute
-  if (dt.minute == lastTriggeredMinute) return;
+  // Prevent multiple triggers in the same minute of the same hour
+  if (dt.hour == lastTriggeredHour && dt.minute == lastTriggeredMinute) return;
 
   for (uint8_t i = 0; i < scheduleCount; i++) {
     if (schedules[i].enabled && schedules[i].hour == dt.hour && schedules[i].minute == dt.minute) {
+      lastTriggeredHour = dt.hour;
       lastTriggeredMinute = dt.minute;
+      Serial.printf("[Schedule] ⏰ Alarm triggered: %02d:%02d (%s, %u ms)\n",
+                    dt.hour, dt.minute, schedules[i].label, schedules[i].durationMs);
       startDispense(schedules[i].durationMs, "schedule", "");
       break;
     }
@@ -421,7 +426,7 @@ void checkOfflineSchedules(FeederDateTime dt) {
 // MQTT MESSAGE HANDLER
 // ----------------------------------------------------------------------------
 void onMqttMessage(char* topic, byte* payload, unsigned int length) {
-  char message[512];
+  char message[1024];
   if (length >= sizeof(message)) length = sizeof(message) - 1;
   memcpy(message, payload, length);
   message[length] = '\0';
@@ -459,7 +464,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
         return;
       }
       const char* cmdId = doc["commandId"] | "";
-      uint16_t duration = doc["durationMs"] | DEFAULT_DURATION_MS;
+      uint16_t duration = doc["durationMs"] | configuredDefaultDurationMs;
       Serial.printf("[MQTT IN] ✅ Feed command parsed: %d ms, cmdId: '%s'\n", duration, cmdId);
       startDispense(duration, "manual_app", cmdId);
     } else {
@@ -468,27 +473,34 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
   }
   // 3. Schedule & Desired Configuration Sync (Check exact topic OR wildcard suffix)
   else if (strcmp(topic, configTopic) == 0 || strstr(topic, "/config/desired") != NULL) {
-    StaticJsonDocument<768> doc;
+    StaticJsonDocument<1024> doc;
     DeserializationError error = deserializeJson(doc, message);
-    if (!error && doc.containsKey("schedules")) {
-      JsonArray schedArr = doc["schedules"].as<JsonArray>();
-      scheduleCount = 0;
-      for (JsonObject s : schedArr) {
-        if (scheduleCount >= MAX_SCHEDULES) break;
-        schedules[scheduleCount].enabled = s["enabled"] | true;
-        schedules[scheduleCount].hour = s["hour"] | 12;
-        schedules[scheduleCount].minute = s["minute"] | 0;
-        schedules[scheduleCount].durationMs = s["durationMs"] | DEFAULT_DURATION_MS;
-        const char* lbl = s["label"] | "Routine";
-        strncpy(schedules[scheduleCount].label, lbl, sizeof(schedules[scheduleCount].label) - 1);
-        scheduleCount++;
+    if (!error) {
+      if (doc.containsKey("defaultDurationMs")) {
+        configuredDefaultDurationMs = doc["defaultDurationMs"] | DEFAULT_DURATION_MS;
+        Serial.printf("[MQTT IN] ⚙️ Configured default dispense duration: %u ms\n", configuredDefaultDurationMs);
       }
-      Serial.printf("[MQTT IN] ✅ Synced %d feeding schedule(s) from cloud!\n", scheduleCount);
-      for (int i = 0; i < scheduleCount; i++) {
-        Serial.printf("   - Alarm #%d: %02d:%02d (%u ms, %s)\n",
-                      i + 1, schedules[i].hour, schedules[i].minute, schedules[i].durationMs, schedules[i].label);
+      if (doc.containsKey("schedules")) {
+        JsonArray schedArr = doc["schedules"].as<JsonArray>();
+        scheduleCount = 0;
+        for (JsonObject s : schedArr) {
+          if (scheduleCount >= MAX_SCHEDULES) break;
+          schedules[scheduleCount].enabled = s["enabled"] | true;
+          schedules[scheduleCount].hour = s["hour"] | 12;
+          schedules[scheduleCount].minute = s["minute"] | 0;
+          schedules[scheduleCount].durationMs = s["durationMs"] | configuredDefaultDurationMs;
+          const char* lbl = s["label"] | "Routine";
+          strncpy(schedules[scheduleCount].label, lbl, sizeof(schedules[scheduleCount].label) - 1);
+          schedules[scheduleCount].label[sizeof(schedules[scheduleCount].label) - 1] = '\0';
+          scheduleCount++;
+        }
+        Serial.printf("[MQTT IN] ✅ Synced %d feeding schedule(s) from cloud!\n", scheduleCount);
+        for (int i = 0; i < scheduleCount; i++) {
+          Serial.printf("   - Alarm #%d: %02d:%02d (%u ms, %s)\n",
+                        i + 1, schedules[i].hour, schedules[i].minute, schedules[i].durationMs, schedules[i].label);
+        }
       }
-    } else if (error) {
+    } else {
       Serial.printf("[MQTT IN] ❌ Schedule JSON Deserialization error: %s\n", error.c_str());
     }
   }
@@ -812,7 +824,7 @@ void loop() {
           // Emergency Stop: Clicking button while dispensing immediately closes gate!
           stopDispense("button_stop");
         } else {
-          startDispense(DEFAULT_DURATION_MS, "button", "");
+          startDispense(configuredDefaultDurationMs, "button", "");
         }
       }
     }
