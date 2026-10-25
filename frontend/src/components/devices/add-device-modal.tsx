@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
-import { Radio, X, Sparkles, CheckCircle2, MapPin, QrCode } from 'lucide-react';
+import { Radio, X, Sparkles, CheckCircle2, MapPin, QrCode, Wifi } from 'lucide-react';
 import { PetIcon } from '@/components/common/pet-icon';
+import { WifiSetupModal } from '@/components/devices/wifi-setup-modal';
 
 interface AddDeviceModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
   const [room, setRoom] = useState('Living Room');
   const [hardwareId, setHardwareId] = useState('feeder_esp32_01');
   const [isPairingSuccess, setIsPairingSuccess] = useState(false);
+  const [showWifiSetupModal, setShowWifiSetupModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -116,9 +118,20 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
               <h3 className="text-xs sm:text-sm font-bold text-[#143503] leading-none">
                 {claimToken ? 'Claim QR Feeder' : 'Pair New Feeder'}
               </h3>
-              <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-semibold mt-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>ESP32 Ready • 2.4GHz Wi-Fi</span>
+              <div className="flex items-center gap-2 text-[10px] text-emerald-700 font-semibold mt-0.5">
+                <span className="flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>ESP32 Ready</span>
+                </span>
+                <span className="text-[#143503]/30">•</span>
+                <button
+                  type="button"
+                  onClick={() => setShowWifiSetupModal(true)}
+                  className="text-emerald-800 hover:text-emerald-950 underline flex items-center gap-0.5 cursor-pointer font-bold"
+                >
+                  <Wifi size={10} />
+                  <span>Wi-Fi Setup Guide</span>
+                </button>
               </div>
             </div>
           </div>
@@ -333,6 +346,12 @@ export function AddDeviceModal({ isOpen, onClose, onAddDevice, claimToken }: Add
           </div>
         </form>
       </div>
+
+      <WifiSetupModal
+        isOpen={showWifiSetupModal}
+        onClose={() => setShowWifiSetupModal(false)}
+        deviceId={hardwareId || 'feeder_esp32_01'}
+      />
     </div>,
     document.body
   );

@@ -27,6 +27,7 @@ import { MelodyPickerModal } from './modals/melody-picker-modal';
 import { RevokeMemberModal } from './modals/revoke-member-modal';
 import { InviteMemberModal } from '@/components/devices/invite-member-modal';
 import { DeviceQrStickerModal } from '@/components/devices/device-qr-sticker-modal';
+import { WifiSetupModal } from '@/components/devices/wifi-setup-modal';
 
 import { Radio, Plus, Sparkles } from 'lucide-react';
 
@@ -97,6 +98,7 @@ function SettingsDashboard({
   // Modals state
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showQrStickerModal, setShowQrStickerModal] = useState(false);
+  const [showWifiModal, setShowWifiModal] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState<{ id: string; name: string } | null>(null);
   const [deviceToUnpair, setDeviceToUnpair] = useState<FeederDevice | null>(null);
   const [showToneModal, setShowToneModal] = useState(false);
@@ -166,6 +168,7 @@ function SettingsDashboard({
         onOpenPairModal={() => context.setIsAddDeviceOpen(true)}
         onPromptUnpair={(dev) => setDeviceToUnpair(dev)}
         onOpenQrSticker={() => setShowQrStickerModal(true)}
+        onOpenWifiGuide={() => setShowWifiModal(true)}
       />
 
       {/* 2. Household & Shared Access Card */}
@@ -209,6 +212,12 @@ function SettingsDashboard({
         isOpen={showQrStickerModal}
         onClose={() => setShowQrStickerModal(false)}
         device={activeDevice}
+      />
+
+      <WifiSetupModal
+        isOpen={showWifiModal}
+        onClose={() => setShowWifiModal(false)}
+        deviceId={activeDevice.id}
       />
 
       <UnpairDeviceModal

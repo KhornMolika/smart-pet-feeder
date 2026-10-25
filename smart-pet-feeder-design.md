@@ -28,7 +28,7 @@ A Wi-Fi-connected, ESP32-based feeder for dry pet food. Owners manage feeding sc
 | Time-based calibration | Should | Test several servo-open durations and manually measure dispensed food with an external scale; store recommended durations only |
 | Low-food detection | Future | Requires an additional suitable sensor; not available in MVP |
 | Jam detection | Future | Requires suitable sensing/feedback; not available in MVP |
-| Wi-Fi provisioning | Should | Set/change credentials using a secure provisioning process |
+| Wi-Fi provisioning | Done | Built-in SoftAP Captive Portal (192.168.4.1), live 2.4GHz network scanner, NVS flash persistence, and 5s tactile button reset |
 | Multiple feeders / pet profiles | Future | Per-user device access and profiles |
 | OTA firmware | Future | Signed firmware updates with rollback plan |
 

@@ -4,7 +4,7 @@ import React from 'react';
 import { FeederDevice } from '@/types/feeder.types';
 import { PetIcon } from '@/components/common/pet-icon';
 import { triggerHaptic } from '@/lib/utils/telegram.util';
-import { Plus, Trash2, MapPin, Check, QrCode } from 'lucide-react';
+import { Plus, Trash2, MapPin, Check, QrCode, Wifi } from 'lucide-react';
 
 interface DeviceFleetCardProps {
   devices: FeederDevice[];
@@ -13,6 +13,7 @@ interface DeviceFleetCardProps {
   onOpenPairModal: () => void;
   onPromptUnpair: (device: FeederDevice) => void;
   onOpenQrSticker: () => void;
+  onOpenWifiGuide?: () => void;
 }
 
 export function DeviceFleetCard({
@@ -22,6 +23,7 @@ export function DeviceFleetCard({
   onOpenPairModal,
   onPromptUnpair,
   onOpenQrSticker,
+  onOpenWifiGuide,
 }: DeviceFleetCardProps) {
   return (
     <div className="artisan-card p-4 sm:p-5 flex flex-col gap-3">
@@ -133,6 +135,21 @@ export function DeviceFleetCard({
             <QrCode size={11} />
             <span>QR Sticker</span>
           </button>
+
+          {onOpenWifiGuide && (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic('light');
+                onOpenWifiGuide();
+              }}
+              className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 hover:text-emerald-950 hover:underline cursor-pointer transition-colors"
+              title="Feeder Wi-Fi Connection Guide"
+            >
+              <Wifi size={11} />
+              <span>Wi-Fi Setup</span>
+            </button>
+          )}
 
           {devices.length > 1 && (
             <button

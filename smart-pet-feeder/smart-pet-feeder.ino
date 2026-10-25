@@ -20,6 +20,9 @@
  */
 
 #include <WiFi.h>
+#include <WebServer.h>
+#include <DNSServer.h>
+#include <Preferences.h>
 #include <time.h>
 #include <PubSubClient.h>
 #include <ESP32Servo.h>
@@ -49,11 +52,15 @@
 const char* DEFAULT_DEVICE_ID = "feeder_esp32_01";
 char deviceId[32]             = "feeder_esp32_01";
 
-// Wi-Fi Credentials
-// - FOR WOKWI SIMULATOR: MUST use SSID "Wokwi-GUEST", Password "" (Cloud simulator cannot see home Wi-Fi)
-// - FOR PHYSICAL HARDWARE: Change to your Wi-Fi/Hotspot (e.g. "AlexKgm", "55alex55")
+// Wi-Fi Credentials (Fallback Defaults; saved custom credentials in NVS take priority)
+// - FOR WOKWI SIMULATOR: SSID "Wokwi-GUEST", Password ""
+// - FOR PHYSICAL HARDWARE: User can configure via Captive Portal "ChinChem-Setup-XXXX" at 192.168.4.1
 const char* WIFI_SSID     = "Oudon";
 const char* WIFI_PASSWORD = "015618134";
+
+// Runtime Wi-Fi buffers (populated from flash NVS or fallback)
+char wifiSsid[64]         = "";
+char wifiPassword[64]     = "";
 
 // MQTT Broker Credentials
 // - For Wokwi Simulator: Use free public cloud broker "broker.hivemq.com" (Port 1883)
@@ -62,6 +69,21 @@ const char* MQTT_SERVER   = "chinchem.molika.app";
 const int   MQTT_PORT     = 1883;
 const char* MQTT_USER     = "";
 const char* MQTT_PASS     = "";
+
+// ----------------------------------------------------------------------------
+// CAPTIVE PORTAL & NON-VOLATILE STORAGE (NVS)
+// ----------------------------------------------------------------------------
+Preferences preferences;
+WebServer webServer(80);
+DNSServer dnsServer;
+const byte DNS_PORT = 53;
+
+bool isProvisioningMode = false;
+unsigned long provisioningStartTime = 0;
+
+// Long-press detection for Tactile Push Button (5s hold -> Wi-Fi Reset & Setup Mode)
+unsigned long buttonPressStartTime = 0;
+bool buttonLongPressHandled = false;
 
 // ----------------------------------------------------------------------------
 // SAFETY LIMITS & TIMINGS
@@ -621,6 +643,411 @@ void updateLcd(FeederDateTime dt) {
 }
 
 // ----------------------------------------------------------------------------
+// CAPTIVE PORTAL HTML TEMPLATES & HANDLERS
+// ----------------------------------------------------------------------------
+const char PORTAL_HEAD[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ChinChem Feeder — Wi-Fi Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background: linear-gradient(135deg, #FFF2E6 0%, #EAF3EC 50%, #BCDBF0 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      color: #143503;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(20, 53, 3, 0.12);
+      border-radius: 28px;
+      padding: 28px 22px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 40px rgba(20, 53, 3, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+    }
+    .header { text-align: center; margin-bottom: 20px; }
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #4B633E;
+      background: #EAF3EC;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(20, 53, 3, 0.1);
+      margin-bottom: 8px;
+    }
+    .title { font-size: 22px; font-weight: 900; color: #143503; margin-bottom: 4px; }
+    .subtitle { font-size: 12.5px; color: #55704a; line-height: 1.4; }
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 11.5px; font-weight: 700; color: #143503; margin-bottom: 5px; }
+    .input-wrapper { position: relative; }
+    input, select {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1.5px solid rgba(20, 53, 3, 0.15);
+      background: #FFFFFF;
+      font-size: 14px;
+      color: #143503;
+      outline: none;
+      transition: all 0.2s;
+    }
+    input:focus, select:focus {
+      border-color: #143503;
+      box-shadow: 0 0 0 3px rgba(20, 53, 3, 0.12);
+    }
+    .toggle-pass {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      font-size: 16px;
+      cursor: pointer;
+      color: #55704a;
+    }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 16px;
+      border: none;
+      background: #143503;
+      color: #FFF2E6;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 12px rgba(20, 53, 3, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn:hover { background: #1b4704; }
+    .btn:active { transform: scale(0.98); }
+    .footer-note {
+      text-align: center;
+      font-size: 11px;
+      color: #7a8b75;
+      margin-top: 16px;
+      line-height: 1.45;
+    }
+    .spinner {
+      display: none;
+      margin: 14px auto 0;
+      text-align: center;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #143503;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      margin-right: 6px;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <span class="badge">ចិញ្ចឹម • SMART PET FEEDER</span>
+      <h1 class="title">Connect to Wi-Fi</h1>
+      <p class="subtitle">Choose your home or hotspot 2.4GHz Wi-Fi to bring your pet feeder online.</p>
+    </div>
+    <form action="/save" method="POST" id="wifiForm" onsubmit="handleSubmit(event)">
+      <div class="form-group">
+        <label for="ssidSelect">Available Wi-Fi Networks</label>
+        <select id="ssidSelect" onchange="handleSelectSsid(this.value)">
+          <option value="" disabled selected>-- Select a Wi-Fi Network --</option>
+)rawliteral";
+
+const char PORTAL_TAIL[] PROGMEM = R"rawliteral(          <option value="__CUSTOM__">➕ Enter Network Manually...</option>
+        </select>
+        <div id="manualSsidWrap" style="display:none; margin-top:8px;">
+          <input type="text" name="ssid" id="ssidInput" placeholder="Enter 2.4GHz Wi-Fi Name (SSID)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="passwordInput">Wi-Fi Password</label>
+        <div class="input-wrapper">
+          <input type="password" name="password" id="passwordInput" placeholder="Wi-Fi Password">
+          <button type="button" class="toggle-pass" onclick="togglePass()">👁️</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="deviceIdInput">Feeder Device ID</label>
+        <input type="text" name="deviceId" id="deviceIdInput" value=")rawliteral";
+
+const char PORTAL_FOOTER[] PROGMEM = R"rawliteral(">
+      </div>
+      <button type="submit" class="btn" id="submitBtn">
+        <span>Save & Connect Feeder</span>
+        <span>🚀</span>
+      </button>
+      <div class="spinner" id="spinner">
+        <span class="pulse-dot"></span>
+        Connecting... Check feeder LCD display!
+      </div>
+    </form>
+    <div class="footer-note">
+      ⚠️ ESP32 connects to <strong>2.4 GHz</strong> Wi-Fi networks only.<br>
+      Hold the physical button for 5 seconds to reset Wi-Fi anytime.
+    </div>
+  </div>
+  <script>
+    function handleSelectSsid(val) {
+      var manual = document.getElementById('manualSsidWrap');
+      var input = document.getElementById('ssidInput');
+      if (val === '__CUSTOM__') {
+        manual.style.display = 'block';
+        input.value = '';
+        input.focus();
+      } else {
+        manual.style.display = 'none';
+        input.value = val;
+      }
+    }
+    function togglePass() {
+      var p = document.getElementById('passwordInput');
+      p.type = p.type === 'password' ? 'text' : 'password';
+    }
+    function handleSubmit(e) {
+      var input = document.getElementById('ssidInput');
+      var sel = document.getElementById('ssidSelect');
+      if (!input.value.trim() && sel.value && sel.value !== '__CUSTOM__') {
+        input.value = sel.value;
+      }
+      if (!input.value.trim()) {
+        alert('Please select or enter your Wi-Fi name!');
+        e.preventDefault();
+        return;
+      }
+      document.getElementById('submitBtn').style.opacity = '0.6';
+      document.getElementById('submitBtn').disabled = true;
+      document.getElementById('spinner').style.display = 'block';
+    }
+  </script>
+</body>
+</html>)rawliteral";
+
+const char SUCCESS_HTML[] PROGMEM = R"rawliteral(<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Credentials Saved</title>
+  <style>
+    body {
+      background: #EAF3EC;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+      color: #143503;
+    }
+    .card {
+      background: #FFFFFF;
+      border-radius: 24px;
+      padding: 32px 24px;
+      text-align: center;
+      max-width: 380px;
+      box-shadow: 0 10px 25px rgba(20,53,3,0.1);
+    }
+    h2 { margin: 12px 0 8px; font-size: 20px; font-weight: 800; }
+    p { font-size: 13px; color: #4B633E; line-height: 1.5; }
+    .icon { font-size: 48px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">🎉</div>
+    <h2>Wi-Fi Saved!</h2>
+    <p>Your ChinChem Feeder is saving credentials and restarting now.<br><br>The LCD display will show your new connection status in a few seconds.<br><br>You can now reconnect your phone to your regular Wi-Fi!</p>
+  </div>
+</body>
+</html>)rawliteral";
+
+void handleRoot() {
+  int n = WiFi.scanComplete();
+  if (n < 0) {
+    n = WiFi.scanNetworks(false, false);
+  }
+
+  String options = "";
+  if (n <= 0) {
+    options += "          <option value=\"\" disabled>No networks detected in range</option>\n";
+  } else {
+    for (int i = 0; i < n && i < 15; ++i) {
+      String foundSsid = WiFi.SSID(i);
+      if (foundSsid.length() == 0) continue;
+      int rssi = WiFi.RSSI(i);
+      int quality = constrain(2 * (rssi + 100), 0, 100);
+      options += "          <option value=\"" + foundSsid + "\">" + foundSsid + " (" + String(quality) + "% signal)</option>\n";
+    }
+  }
+
+  String page = FPSTR(PORTAL_HEAD);
+  page += options;
+  page += FPSTR(PORTAL_TAIL);
+  page += deviceId;
+  page += FPSTR(PORTAL_FOOTER);
+
+  webServer.send(200, "text/html", page);
+}
+
+void handleSave() {
+  String newSsid = webServer.arg("ssid");
+  String newPass = webServer.arg("password");
+  String newDevId = webServer.arg("deviceId");
+
+  newSsid.trim();
+  newPass.trim();
+  newDevId.trim();
+
+  if (newSsid.length() == 0) {
+    webServer.send(400, "text/plain", "SSID cannot be empty!");
+    return;
+  }
+
+  Serial.println(F("\n[Portal] 💾 Saving new Wi-Fi credentials to NVS flash..."));
+  Serial.printf("[Portal]   SSID:      %s\n", newSsid.c_str());
+  Serial.printf("[Portal]   Device ID: %s\n", newDevId.length() > 0 ? newDevId.c_str() : deviceId);
+
+  preferences.begin("feeder-cfg", false);
+  preferences.putString("ssid", newSsid);
+  preferences.putString("pass", newPass);
+  if (newDevId.length() > 0) {
+    preferences.putString("devId", newDevId);
+  }
+  preferences.end();
+
+  webServer.send(200, "text/html", FPSTR(SUCCESS_HTML));
+
+  buzzerChirpSuccess();
+  delay(1500);
+
+  Serial.println(F("[Portal] Restarting ESP32 to connect to new Wi-Fi..."));
+  ESP.restart();
+}
+
+void handleNotFound() {
+  String host = webServer.hostHeader();
+  if (host.length() > 0 && host.indexOf("192.168.4.1") < 0) {
+    webServer.sendHeader("Location", "http://192.168.4.1/", true);
+    webServer.send(302, "text/plain", "");
+    webServer.client().stop();
+    return;
+  }
+  handleRoot();
+}
+
+void startCaptivePortal() {
+  isProvisioningMode = true;
+  provisioningStartTime = millis();
+
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_AP_STA);
+
+  char apSsid[32];
+  snprintf(apSsid, sizeof(apSsid), "ChinChem-Setup-%s", deviceId);
+
+  IPAddress apIP(192, 168, 4, 1);
+  IPAddress netMsk(255, 255, 255, 0);
+  WiFi.softAPConfig(apIP, apIP, netMsk);
+  WiFi.softAP(apSsid);
+
+  Serial.println(F("\n=================================================="));
+  Serial.printf("[Portal] 🚀 Captive Portal Setup Hotspot Activated!\n");
+  Serial.printf("[Portal]   Access Point: %s\n", apSsid);
+  Serial.printf("[Portal]   Setup URL:    http://192.168.4.1/\n");
+  Serial.println(F("=================================================="));
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Setup Mode (AP):");
+  lcd.setCursor(0, 1);
+  lcd.print("192.168.4.1");
+
+  WiFi.scanNetworks(true);
+
+  dnsServer.setErrorReplyCode(DNSReplyCode::NoError);
+  dnsServer.start(DNS_PORT, "*", apIP);
+
+  webServer.on("/", HTTP_GET, handleRoot);
+  webServer.on("/save", HTTP_POST, handleSave);
+  webServer.on("/generate_204", HTTP_GET, handleRoot);
+  webServer.on("/gen_204", HTTP_GET, handleRoot);
+  webServer.on("/hotspot-detect.html", HTTP_GET, handleRoot);
+  webServer.on("/connecttest.txt", HTTP_GET, handleRoot);
+  webServer.on("/ncsi.txt", HTTP_GET, handleRoot);
+  webServer.onNotFound(handleNotFound);
+
+  webServer.begin();
+  buzzerChirpSuccess();
+}
+
+bool attemptWiFiConnection(const char* ssid, const char* pass, unsigned long timeoutMs = 14000) {
+  if (strlen(ssid) == 0) return false;
+
+  Serial.println(F("\n=================================================="));
+  Serial.printf("[WiFi] Connecting to SSID: '%s'...\n", ssid);
+  Serial.println(F("=================================================="));
+  Serial.flush();
+
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Connecting WiFi:");
+  lcd.setCursor(0, 1);
+  lcd.print(ssid);
+
+  WiFi.disconnect(true);
+  delay(100);
+  WiFi.mode(WIFI_STA);
+  WiFi.setAutoReconnect(true);
+  WiFi.persistent(false);
+  WiFi.begin(ssid, pass);
+
+  unsigned long startAttemptTime = millis();
+  int dotCount = 0;
+
+  while (WiFi.status() != WL_CONNECTED && (millis() - startAttemptTime < timeoutMs)) {
+    delay(500);
+    Serial.print(F("."));
+    dotCount++;
+    lcd.setCursor(15, 1);
+    lcd.print((dotCount % 2 == 0) ? "." : " ");
+  }
+  Serial.println();
+
+  return (WiFi.status() == WL_CONNECTED);
+}
+
+// ----------------------------------------------------------------------------
 // SETUP
 // ----------------------------------------------------------------------------
 void setup() {
@@ -670,39 +1097,39 @@ void setup() {
   Serial.println(F("[Schedule] Feeder starts with 0 schedules (awaiting config from app)."));
   Serial.flush();
 
-  // 6. Connect Wi-Fi with animated status, timeout & detailed diagnostics
-  Serial.println(F("\n=================================================="));
-  Serial.printf("[WiFi] Connecting to SSID: '%s'...\n", WIFI_SSID);
-  Serial.println(F("=================================================="));
-  Serial.flush();
+  // 6. Connect Wi-Fi (Saved credentials in NVS, fallback, or Captive Portal)
+  preferences.begin("feeder-cfg", false);
+  String savedSsid = preferences.getString("ssid", "");
+  String savedPass = preferences.getString("pass", "");
+  String savedDevId = preferences.getString("devId", "");
+  preferences.end();
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Connecting WiFi:");
-  lcd.setCursor(0, 1);
-  lcd.print(WIFI_SSID);
-
-  WiFi.disconnect(true); // Clear previous connection states
-  delay(100);
-  WiFi.mode(WIFI_STA);
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(false);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  unsigned long startAttemptTime = millis();
-  const unsigned long wifiTimeout = 15000; // 15 seconds connection timeout
-  int dotCount = 0;
-
-  while (WiFi.status() != WL_CONNECTED && (millis() - startAttemptTime < wifiTimeout)) {
-    delay(500);
-    Serial.print(F("."));
-    dotCount++;
-    lcd.setCursor(15, 1);
-    lcd.print((dotCount % 2 == 0) ? "." : " ");
+  if (savedDevId.length() > 0) {
+    strncpy(deviceId, savedDevId.c_str(), sizeof(deviceId) - 1);
+  } else {
+    strncpy(deviceId, DEFAULT_DEVICE_ID, sizeof(deviceId) - 1);
   }
-  Serial.println();
 
-  if (WiFi.status() == WL_CONNECTED) {
+  bool connected = false;
+
+  if (savedSsid.length() > 0) {
+    strncpy(wifiSsid, savedSsid.c_str(), sizeof(wifiSsid) - 1);
+    strncpy(wifiPassword, savedPass.c_str(), sizeof(wifiPassword) - 1);
+    Serial.printf("[Config] 💾 Found saved Wi-Fi in NVS: '%s'\n", wifiSsid);
+    connected = attemptWiFiConnection(wifiSsid, wifiPassword, 14000);
+  }
+
+  // If saved Wi-Fi didn't connect (or doesn't exist), try fallback if defined
+  if (!connected && strlen(WIFI_SSID) > 0 && strcmp(WIFI_SSID, wifiSsid) != 0) {
+    Serial.printf("[Config] Trying fallback factory Wi-Fi: '%s'...\n", WIFI_SSID);
+    connected = attemptWiFiConnection(WIFI_SSID, WIFI_PASSWORD, 10000);
+    if (connected) {
+      strncpy(wifiSsid, WIFI_SSID, sizeof(wifiSsid) - 1);
+      strncpy(wifiPassword, WIFI_PASSWORD, sizeof(wifiPassword) - 1);
+    }
+  }
+
+  if (connected) {
     Serial.println(F("✅ [WiFi] Connected successfully!"));
     Serial.print(F("[WiFi] IP Address: "));
     Serial.println(WiFi.localIP());
@@ -716,38 +1143,18 @@ void setup() {
     lcd.setCursor(0, 1);
     lcd.print(WiFi.localIP());
     delay(1500);
-  } else {
-    Serial.println(F("❌ [WiFi] Connection Failed or Timed Out!"));
-    int status = WiFi.status();
-    Serial.printf("[WiFi] Error Status Code: %d -> ", status);
-    switch (status) {
-      case WL_NO_SSID_AVAIL:   Serial.println(F("SSID NOT FOUND! Make sure the router/hotspot is powered on & 2.4GHz is enabled.")); break;
-      case WL_CONNECT_FAILED:  Serial.println(F("AUTHENTICATION FAILED! Check Wi-Fi password.")); break;
-      case WL_CONNECTION_LOST: Serial.println(F("CONNECTION LOST during handshake.")); break;
-      case WL_DISCONNECTED:    Serial.println(F("DISCONNECTED! Check network signal.")); break;
-      default:                 Serial.println(F("IDLE / UNKNOWN STATUS.")); break;
-    }
-    Serial.println(F("💡 Troubleshooting Wi-Fi:"));
-    Serial.println(F("   1. ESP32 ONLY supports 2.4 GHz Wi-Fi (NOT 5 GHz)."));
-    Serial.println(F("   2. If using iPhone hotspot, turn ON 'Maximize Compatibility'."));
-    Serial.println(F("   3. If using Android hotspot, ensure AP Band is set to '2.4 GHz'."));
-    Serial.println(F("   4. OFFLINE MODE: Feeder schedules & push button continue working via RTC!"));
 
+    // 7. Configure MQTT
+    mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
+    mqttClient.setCallback(onMqttMessage);
+
+    buzzerChirpComplete();
+    delay(500);
     lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("WiFi Failed!");
-    lcd.setCursor(0, 1);
-    lcd.print("Running Offline");
-    delay(2000);
+  } else {
+    Serial.println(F("❌ [WiFi] Connection Failed. Launching Captive Portal Setup Hotspot..."));
+    startCaptivePortal();
   }
-
-  // 7. Configure MQTT
-  mqttClient.setServer(MQTT_SERVER, MQTT_PORT);
-  mqttClient.setCallback(onMqttMessage);
-
-  buzzerChirpComplete();
-  delay(500);
-  lcd.clear();
 }
 
 // ----------------------------------------------------------------------------
@@ -755,6 +1162,49 @@ void setup() {
 // ----------------------------------------------------------------------------
 void loop() {
   unsigned long now = millis();
+
+  // 0. Handle Captive Portal in Provisioning Mode
+  if (isProvisioningMode) {
+    dnsServer.processNextRequest();
+    webServer.handleClient();
+
+    // In provisioning mode, keep LCD refreshed with AP details
+    static unsigned long lastApLcdUpdate = 0;
+    if (now - lastApLcdUpdate >= 1000) {
+      lastApLcdUpdate = now;
+      char apName[17];
+      snprintf(apName, sizeof(apName), "Setup: %s", deviceId);
+      lcd.setCursor(0, 0);
+      lcd.print(apName);
+      lcd.setCursor(0, 1);
+      lcd.print("IP: 192.168.4.1 ");
+    }
+
+    // Check offline RTC & Schedules
+    FeederDateTime nowDt = rtcGetTime();
+    checkOfflineSchedules(nowDt);
+    updateDispenseEngine();
+
+    // Push button short click during setup mode allows testing dispense
+    int reading = digitalRead(PIN_BUTTON);
+    if (reading != lastButtonReading) {
+      lastDebounceTime = now;
+    }
+    if ((now - lastDebounceTime) > DEBOUNCE_DELAY_MS) {
+      if (reading != buttonState) {
+        buttonState = reading;
+        if (buttonState == LOW) {
+          if (currentState == STATE_DISPENSING) {
+            stopDispense("button_stop");
+          } else {
+            startDispense(configuredDefaultDurationMs, "button", "");
+          }
+        }
+      }
+    }
+    lastButtonReading = reading;
+    return; // Don't run MQTT client while waiting for Wi-Fi provisioning
+  }
 
   // 1. Maintain Wi-Fi, NTP Local Time Sync, and MQTT
   static unsigned long lastWifiRetry = 0;
@@ -779,11 +1229,14 @@ void loop() {
       lastWifiRetry = now;
       wifiRetryCount++;
       int status = WiFi.status();
-      Serial.printf("[WiFi] Background reconnect attempt #%d (status code: %d)...\n", wifiRetryCount, status);
+      const char* targetSsid = strlen(wifiSsid) > 0 ? wifiSsid : WIFI_SSID;
+      const char* targetPass = strlen(wifiPassword) > 0 ? wifiPassword : WIFI_PASSWORD;
+
+      Serial.printf("[WiFi] Background reconnect attempt #%d (status code: %d) to '%s'...\n", wifiRetryCount, status, targetSsid);
 
       // Periodically scan nearby networks to verify if hotspot SSID is visible in the air
       if (wifiRetryCount % 3 == 0) {
-        Serial.printf("[WiFi] 🔍 Scanning nearby 2.4GHz Wi-Fi networks for '%s'...\n", WIFI_SSID);
+        Serial.printf("[WiFi] 🔍 Scanning nearby 2.4GHz Wi-Fi networks for '%s'...\n", targetSsid);
         int n = WiFi.scanNetworks(false, false);
         bool found = false;
         if (n <= 0) {
@@ -793,17 +1246,17 @@ void loop() {
           for (int i = 0; i < n && i < 6; ++i) {
             String foundSsid = WiFi.SSID(i);
             Serial.printf("   - '%s' (%d dBm)\n", foundSsid.c_str(), WiFi.RSSI(i));
-            if (foundSsid.equalsIgnoreCase(WIFI_SSID)) {
+            if (foundSsid.equalsIgnoreCase(targetSsid)) {
               found = true;
             }
           }
           if (!found) {
-            Serial.printf("[WiFi] ⚠️ SSID '%s' not visible. Ensure phone hotspot is ON & set to 2.4GHz.\n", WIFI_SSID);
+            Serial.printf("[WiFi] ⚠️ SSID '%s' not visible. Ensure phone hotspot is ON & set to 2.4GHz.\n", targetSsid);
           }
         }
       }
 
-      WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+      WiFi.begin(targetSsid, targetPass);
     }
   }
 
@@ -811,7 +1264,7 @@ void loop() {
   FeederDateTime nowDt = rtcGetTime();
   checkOfflineSchedules(nowDt);
 
-  // 3. Tactile Push Button Handling (Debounced)
+  // 3. Tactile Push Button Handling (Debounced with Long-Press Wi-Fi Reset)
   int reading = digitalRead(PIN_BUTTON);
   if (reading != lastButtonReading) {
     lastDebounceTime = now;
@@ -819,17 +1272,51 @@ void loop() {
   if ((now - lastDebounceTime) > DEBOUNCE_DELAY_MS) {
     if (reading != buttonState) {
       buttonState = reading;
-      if (buttonState == LOW) { // Button pressed (active-low)
-        if (currentState == STATE_DISPENSING) {
-          // Emergency Stop: Clicking button while dispensing immediately closes gate!
-          stopDispense("button_stop");
-        } else {
-          startDispense(configuredDefaultDurationMs, "button", "");
+      if (buttonState == LOW) {
+        // Button just pressed down
+        buttonPressStartTime = now;
+        buttonLongPressHandled = false;
+      } else {
+        // Button released
+        if (!buttonLongPressHandled) {
+          unsigned long pressDuration = now - buttonPressStartTime;
+          if (pressDuration < 5000) {
+            if (currentState == STATE_DISPENSING) {
+              // Emergency Stop: Clicking button while dispensing immediately closes gate!
+              stopDispense("button_stop");
+            } else {
+              startDispense(configuredDefaultDurationMs, "button", "");
+            }
+          }
         }
       }
     }
   }
   lastButtonReading = reading;
+
+  // Check for Long Press (5 seconds) to reset Wi-Fi & re-enter Captive Portal
+  if (buttonState == LOW && !buttonLongPressHandled) {
+    if (now - buttonPressStartTime >= 5000) {
+      buttonLongPressHandled = true;
+      Serial.println(F("\n[Button] ⚠️ 5-second hold detected! Resetting Wi-Fi & launching Setup Hotspot..."));
+
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Resetting Wi-Fi!");
+      lcd.setCursor(0, 1);
+      lcd.print("Launching AP...");
+
+      buzzerBeepError();
+
+      preferences.begin("feeder-cfg", false);
+      preferences.remove("ssid");
+      preferences.remove("pass");
+      preferences.end();
+
+      delay(1500);
+      ESP.restart();
+    }
+  }
 
   // 4. Update Servo Actuation Engine
   updateDispenseEngine();
