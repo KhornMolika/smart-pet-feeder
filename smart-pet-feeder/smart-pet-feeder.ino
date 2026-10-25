@@ -55,8 +55,8 @@ char deviceId[32]             = "feeder_esp32_01";
 // Wi-Fi Credentials (Fallback Defaults; saved custom credentials in NVS take priority)
 // - FOR WOKWI SIMULATOR: SSID "Wokwi-GUEST", Password ""
 // - FOR PHYSICAL HARDWARE: User can configure via Captive Portal "ChinChem-Setup-XXXX" at 192.168.4.1
-const char* WIFI_SSID     = "Oudon";
-const char* WIFI_PASSWORD = "015618134";
+const char* WIFI_SSID     = "";
+const char* WIFI_PASSWORD = "";
 
 // Runtime Wi-Fi buffers (populated from flash NVS or fallback)
 char wifiSsid[64]         = "";
@@ -777,16 +777,14 @@ const char PORTAL_HEAD[] PROGMEM = R"rawliteral(<!DOCTYPE html>
     </div>
     <form action="/save" method="POST" id="wifiForm" onsubmit="handleSubmit(event)">
       <div class="form-group">
-        <label for="ssidSelect">Available Wi-Fi Networks</label>
-        <select id="ssidSelect" onchange="handleSelectSsid(this.value)">
-          <option value="" disabled selected>-- Select a Wi-Fi Network --</option>
+        <label for="ssidInput">Wi-Fi Network Name (SSID)</label>
+        <select id="ssidSelect" onchange="var inp=document.getElementById('ssidInput'); if(this.value=='__CUSTOM__'){inp.value=''; inp.focus();} else {inp.value=this.value;}">
+          <option value="" disabled selected>-- Select Detected Network --</option>
 )rawliteral";
 
-const char PORTAL_TAIL[] PROGMEM = R"rawliteral(          <option value="__CUSTOM__">➕ Enter Network Manually...</option>
+const char PORTAL_TAIL[] PROGMEM = R"rawliteral(          <option value="__CUSTOM__">➕ Enter Other Wi-Fi...</option>
         </select>
-        <div id="manualSsidWrap" style="display:none; margin-top:8px;">
-          <input type="text" name="ssid" id="ssidInput" placeholder="Enter 2.4GHz Wi-Fi Name (SSID)">
-        </div>
+        <input type="text" name="ssid" id="ssidInput" placeholder="Wi-Fi SSID (e.g. MyPhoneHotspot)" style="margin-top:8px;" required>
       </div>
       <div class="form-group">
         <label for="passwordInput">Wi-Fi Password</label>
@@ -815,31 +813,14 @@ const char PORTAL_FOOTER[] PROGMEM = R"rawliteral(">
       Hold the physical button for 5 seconds to reset Wi-Fi anytime.
     </div>
   </div>
-  <script>
-    function handleSelectSsid(val) {
-      var manual = document.getElementById('manualSsidWrap');
-      var input = document.getElementById('ssidInput');
-      if (val === '__CUSTOM__') {
-        manual.style.display = 'block';
-        input.value = '';
-        input.focus();
-      } else {
-        manual.style.display = 'none';
-        input.value = val;
-      }
-    }
     function togglePass() {
       var p = document.getElementById('passwordInput');
       p.type = p.type === 'password' ? 'text' : 'password';
     }
     function handleSubmit(e) {
       var input = document.getElementById('ssidInput');
-      var sel = document.getElementById('ssidSelect');
-      if (!input.value.trim() && sel.value && sel.value !== '__CUSTOM__') {
-        input.value = sel.value;
-      }
       if (!input.value.trim()) {
-        alert('Please select or enter your Wi-Fi name!');
+        alert('Please enter or select a Wi-Fi network!');
         e.preventDefault();
         return;
       }
@@ -954,12 +935,17 @@ void handleSave() {
   ESP.restart();
 }
 
+void handleCaptiveRedirect() {
+  Serial.printf("[Portal] 🔀 Captive probe redirected (%s) -> http://192.168.4.1/\n", webServer.uri().c_str());
+  webServer.sendHeader("Location", "http://192.168.4.1/", true);
+  webServer.send(302, "text/plain", "");
+  webServer.client().stop();
+}
+
 void handleNotFound() {
   String host = webServer.hostHeader();
   if (host.length() > 0 && host.indexOf("192.168.4.1") < 0) {
-    webServer.sendHeader("Location", "http://192.168.4.1/", true);
-    webServer.send(302, "text/plain", "");
-    webServer.client().stop();
+    handleCaptiveRedirect();
     return;
   }
   handleRoot();
@@ -1000,11 +986,11 @@ void startCaptivePortal() {
 
   webServer.on("/", HTTP_GET, handleRoot);
   webServer.on("/save", HTTP_POST, handleSave);
-  webServer.on("/generate_204", HTTP_GET, handleRoot);
-  webServer.on("/gen_204", HTTP_GET, handleRoot);
-  webServer.on("/hotspot-detect.html", HTTP_GET, handleRoot);
-  webServer.on("/connecttest.txt", HTTP_GET, handleRoot);
-  webServer.on("/ncsi.txt", HTTP_GET, handleRoot);
+  webServer.on("/generate_204", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/gen_204", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/hotspot-detect.html", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/connecttest.txt", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/ncsi.txt", HTTP_GET, handleCaptiveRedirect);
   webServer.onNotFound(handleNotFound);
 
   webServer.begin();
@@ -1116,7 +1102,24 @@ void setup() {
     strncpy(wifiSsid, savedSsid.c_str(), sizeof(wifiSsid) - 1);
     strncpy(wifiPassword, savedPass.c_str(), sizeof(wifiPassword) - 1);
     Serial.printf("[Config] 💾 Found saved Wi-Fi in NVS: '%s'\n", wifiSsid);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Connecting WiFi:");
+    lcd.setCursor(0, 1);
+    lcd.print(wifiSsid);
+
     connected = attemptWiFiConnection(wifiSsid, wifiPassword, 14000);
+    if (!connected) {
+      Serial.printf("❌ [WiFi] Connection to '%s' failed!\n", wifiSsid);
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("WiFi Failed!");
+      lcd.setCursor(0, 1);
+      lcd.print("Check 2.4G/Pass");
+      buzzerBeepError();
+      delay(3000); // 3 seconds display so user clearly sees the failure
+    }
   }
 
   // If saved Wi-Fi didn't connect (or doesn't exist), try fallback if defined

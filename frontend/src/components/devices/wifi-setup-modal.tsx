@@ -138,9 +138,9 @@ export function WifiSetupModal({ isOpen, onClose, deviceId = 'feeder_esp32_01' }
               2
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-[11px] font-bold text-[#143503]">Connect Phone to Feeder Wi-Fi</span>
+              <span className="text-[11px] font-bold text-[#143503]">Connect Phone to Setup Hotspot</span>
               <p className="text-[10px] text-[#4B633E] leading-relaxed mt-0.5">
-                Open phone Wi-Fi settings and connect to <strong className="font-mono text-[#143503]">ChinChem-Setup-{deviceId}</strong>. No password needed.
+                Turn <strong>OFF Cellular Data (4G/5G)</strong> temporarily, open Wi-Fi settings, and tap <strong className="font-mono text-[#143503]">ChinChem-Setup-{deviceId}</strong>.
               </p>
             </div>
           </div>
@@ -151,9 +151,9 @@ export function WifiSetupModal({ isOpen, onClose, deviceId = 'feeder_esp32_01' }
               3
             </div>
             <div className="flex flex-col text-left">
-              <span className="text-[11px] font-bold text-[#143503]">Select Home Wi-Fi & Save</span>
+              <span className="text-[11px] font-bold text-[#143503]">Open Setup Page & Save Wi-Fi</span>
               <p className="text-[10px] text-[#4B633E] leading-relaxed mt-0.5">
-                The setup page opens automatically (or visit <strong className="font-mono text-[#143503]">192.168.4.1</strong>). Pick your 2.4GHz Wi-Fi, enter your password, and click <strong className="text-[#143503]">Save & Connect</strong>.
+                If the screen does not pop up automatically, open <strong>Chrome or Safari</strong> and type <strong className="font-mono text-[#143503]">http://192.168.4.1</strong>. Choose your Wi-Fi, type password, and click <strong className="text-[#143503]">Save & Connect</strong>.
               </p>
             </div>
           </div>
@@ -172,11 +172,19 @@ export function WifiSetupModal({ isOpen, onClose, deviceId = 'feeder_esp32_01' }
           </div>
         </div>
 
-        {/* 4. Hardware Button Reset Tip */}
-        <div className="p-2.5 rounded-2xl bg-[#FFF8EB] border border-amber-500/20 flex items-start gap-2 text-[10px] text-amber-950 relative z-10">
-          <RotateCcw size={13} className="text-amber-700 shrink-0 mt-0.5" />
+        {/* 4. Campus / School Wi-Fi Warning */}
+        <div className="p-2.5 rounded-2xl bg-amber-50 border border-amber-500/25 flex items-start gap-2 text-[10px] text-amber-950 relative z-10">
+          <AlertTriangle size={14} className="text-amber-700 shrink-0 mt-0.5" />
           <div className="leading-relaxed">
-            <span className="font-bold text-amber-900">Moving to a new Wi-Fi?</span> Hold the physical green button on the feeder for <strong>5 seconds</strong> to reset Wi-Fi and restart setup mode anytime.
+            <strong className="text-amber-900">At school or university?</strong> Campus networks with student login portals or 5GHz (Enterprise 802.1X) cannot connect to ESP32. Please use your <strong>Phone Personal Hotspot (2.4GHz)</strong> or Home Wi-Fi!
+          </div>
+        </div>
+
+        {/* 5. Hardware Button Reset Tip */}
+        <div className="p-2.5 rounded-2xl bg-[#FFF8EB] border border-[#143503]/10 flex items-start gap-2 text-[10px] text-[#4B633E] relative z-10">
+          <RotateCcw size={13} className="text-[#143503] shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <span className="font-bold text-[#143503]">Moving to a new Wi-Fi?</span> Hold the physical green button on the feeder for <strong>5 seconds</strong> to reset Wi-Fi and restart setup mode anytime.
           </div>
         </div>
 
