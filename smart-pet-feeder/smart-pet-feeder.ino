@@ -521,6 +521,7 @@ void onMqttMessage(char* topic, byte* payload, unsigned int length) {
           Serial.printf("   - Alarm #%d: %02d:%02d (%u ms, %s)\n",
                         i + 1, schedules[i].hour, schedules[i].minute, schedules[i].durationMs, schedules[i].label);
         }
+        saveSchedulesToNvs();
       }
     } else {
       Serial.printf("[MQTT IN] ❌ Schedule JSON Deserialization error: %s\n", error.c_str());
@@ -571,22 +572,96 @@ void reconnectMqtt() {
   }
 }
 
-int getNextScheduleIndex(FeederDateTime dt) {
-  if (scheduleCount == 0) return -1;
-  int curTotalMin = dt.hour * 60 + dt.minute;
+// ----------------------------------------------------------------------------
+// SCHEDULE PERSISTENCE (NVS FLASH)
+// ----------------------------------------------------------------------------
+void saveSchedulesToNvs() {
+  preferences.begin("feeder-cfg", false);
+  preferences.putUChar("sched_cnt", scheduleCount);
+  for (uint8_t i = 0; i < scheduleCount; i++) {
+    char key[16];
+    snprintf(key, sizeof(key), "sc_%d_en", i);
+    preferences.putBool(key, schedules[i].enabled);
+    snprintf(key, sizeof(key), "sc_%d_hr", i);
+    preferences.putUChar(key, schedules[i].hour);
+    snprintf(key, sizeof(key), "sc_%d_mn", i);
+    preferences.putUChar(key, schedules[i].minute);
+    snprintf(key, sizeof(key), "sc_%d_dur", i);
+    preferences.putUShort(key, schedules[i].durationMs);
+    snprintf(key, sizeof(key), "sc_%d_lbl", i);
+    preferences.putString(key, schedules[i].label);
+  }
+  preferences.end();
+  Serial.printf("[NVS] 💾 Saved %d schedule(s) to permanent flash.\n", scheduleCount);
+}
+
+void loadSchedulesFromNvs() {
+  preferences.begin("feeder-cfg", true);
+  uint8_t cnt = preferences.getUChar("sched_cnt", 0);
+  if (cnt > 0 && cnt <= MAX_SCHEDULES) {
+    scheduleCount = cnt;
+    for (uint8_t i = 0; i < scheduleCount; i++) {
+      char key[16];
+      snprintf(key, sizeof(key), "sc_%d_en", i);
+      schedules[i].enabled = preferences.getBool(key, true);
+      snprintf(key, sizeof(key), "sc_%d_hr", i);
+      schedules[i].hour = preferences.getUChar(key, 8);
+      snprintf(key, sizeof(key), "sc_%d_mn", i);
+      schedules[i].minute = preferences.getUChar(key, 0);
+      snprintf(key, sizeof(key), "sc_%d_dur", i);
+      schedules[i].durationMs = preferences.getUShort(key, DEFAULT_DURATION_MS);
+      snprintf(key, sizeof(key), "sc_%d_lbl", i);
+      String lbl = preferences.getString(key, "Meal");
+      strncpy(schedules[i].label, lbl.c_str(), sizeof(schedules[i].label) - 1);
+      schedules[i].label[sizeof(schedules[i].label) - 1] = '\0';
+    }
+    preferences.end();
+    Serial.printf("[NVS] 📂 Restored %d schedule(s) from flash storage!\n", scheduleCount);
+    for (int i = 0; i < scheduleCount; i++) {
+      Serial.printf("   - Loaded Alarm #%d: %02d:%02d (%s, %u ms, %s)\n",
+                    i + 1, schedules[i].hour, schedules[i].minute, schedules[i].label, schedules[i].durationMs,
+                    schedules[i].enabled ? "ENABLED" : "DISABLED");
+    }
+  } else {
+    preferences.end();
+    // Default fallback daily alarms (08:00 Breakfast & 18:00 Dinner)
+    scheduleCount = 2;
+    schedules[0].enabled = true;
+    schedules[0].hour = 8;
+    schedules[0].minute = 0;
+    schedules[0].durationMs = DEFAULT_DURATION_MS;
+    strncpy(schedules[0].label, "Breakfast", sizeof(schedules[0].label) - 1);
+
+    schedules[1].enabled = true;
+    schedules[1].hour = 18;
+    schedules[1].minute = 0;
+    schedules[1].durationMs = DEFAULT_DURATION_MS;
+    strncpy(schedules[1].label, "Dinner", sizeof(schedules[1].label) - 1);
+    Serial.println(F("[Schedule] No schedules in flash. Initialized with default daily alarms (08:00 & 18:00)."));
+  }
+}
+
+int getNextScheduleIndex(FeederDateTime dt, int& minutesUntilNext) {
+  if (scheduleCount == 0) {
+    minutesUntilNext = -1;
+    return -1;
+  }
+  int curTotalMin = dt.valid ? (dt.hour * 60 + dt.minute) : 0;
   int minDiff = 24 * 60 + 1;
-  int bestIdx = 0;
+  int bestIdx = -1;
 
   for (int i = 0; i < scheduleCount; i++) {
     if (!schedules[i].enabled) continue;
     int schedTotalMin = schedules[i].hour * 60 + schedules[i].minute;
     int diff = schedTotalMin - curTotalMin;
-    if (diff <= 0) diff += 24 * 60; // Next occurrence is tomorrow
+    if (diff <= 0) diff += 24 * 60; // Next occurrence is tomorrow or later today
     if (diff < minDiff) {
       minDiff = diff;
       bestIdx = i;
     }
   }
+
+  minutesUntilNext = (bestIdx >= 0) ? minDiff : -1;
   return bestIdx;
 }
 
@@ -632,8 +707,39 @@ void updateLcd(FeederDateTime dt) {
     unsigned long remainingCooldown = (COOLDOWN_MS - (millis() - lastDispenseEndTime)) / 1000 + 1;
     snprintf(rawLine2, sizeof(rawLine2), "Cooling... %lus", remainingCooldown);
   } else if (scheduleCount > 0) {
-    int nextIdx = getNextScheduleIndex(dt);
-    snprintf(rawLine2, sizeof(rawLine2), "Next: %02d:%02d", schedules[nextIdx].hour, schedules[nextIdx].minute);
+    int minutesUntil = 0;
+    int nextIdx = getNextScheduleIndex(dt, minutesUntil);
+
+    if (nextIdx >= 0 && dt.valid) {
+      // Dynamic rotating info:
+      // Screen A (3s): "Next 08:00 Bkfst" (Schedule time + meal name)
+      // Screen B (3s): "In 1h 30m (15s)"  (Live countdown + portion size)
+      static unsigned long lastLcdFlip = 0;
+      static bool showCountdown = false;
+      if (now - lastLcdFlip >= 3000) {
+        lastLcdFlip = now;
+        showCountdown = !showCountdown;
+      }
+
+      if (showCountdown && minutesUntil > 0) {
+        int hrs = minutesUntil / 60;
+        int mins = minutesUntil % 60;
+        if (hrs > 0) {
+          snprintf(rawLine2, sizeof(rawLine2), "In %dh %02dm (%us)", hrs, mins, schedules[nextIdx].durationMs / 1000);
+        } else {
+          snprintf(rawLine2, sizeof(rawLine2), "In %dm (%us)", mins, schedules[nextIdx].durationMs / 1000);
+        }
+      } else {
+        char cleanLbl[7];
+        strncpy(cleanLbl, schedules[nextIdx].label, 6);
+        cleanLbl[6] = '\0';
+        snprintf(rawLine2, sizeof(rawLine2), "Next %02d:%02d %s", schedules[nextIdx].hour, schedules[nextIdx].minute, cleanLbl);
+      }
+    } else if (nextIdx >= 0) {
+      snprintf(rawLine2, sizeof(rawLine2), "Next %02d:%02d Meal", schedules[nextIdx].hour, schedules[nextIdx].minute);
+    } else {
+      snprintf(rawLine2, sizeof(rawLine2), "All Alarms Off");
+    }
   } else {
     snprintf(rawLine2, sizeof(rawLine2), "Ready to Feed");
   }
@@ -813,6 +919,7 @@ const char PORTAL_FOOTER[] PROGMEM = R"rawliteral(">
       Hold the physical button for 5 seconds to reset Wi-Fi anytime.
     </div>
   </div>
+  <script>
     function togglePass() {
       var p = document.getElementById('passwordInput');
       p.type = p.type === 'password' ? 'text' : 'password';
@@ -938,7 +1045,10 @@ void handleSave() {
 void handleCaptiveRedirect() {
   Serial.printf("[Portal] 🔀 Captive probe redirected (%s) -> http://192.168.4.1/\n", webServer.uri().c_str());
   webServer.sendHeader("Location", "http://192.168.4.1/", true);
-  webServer.send(302, "text/plain", "");
+  webServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  webServer.sendHeader("Pragma", "no-cache");
+  webServer.sendHeader("Expires", "-1");
+  webServer.send(302, "text/html", "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0;url=http://192.168.4.1/'></head><body><a href='http://192.168.4.1/'>Redirecting to Setup...</a></body></html>");
   webServer.client().stop();
 }
 
@@ -989,8 +1099,11 @@ void startCaptivePortal() {
   webServer.on("/generate_204", HTTP_GET, handleCaptiveRedirect);
   webServer.on("/gen_204", HTTP_GET, handleCaptiveRedirect);
   webServer.on("/hotspot-detect.html", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/canonical.html", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/library/test/success.html", HTTP_GET, handleCaptiveRedirect);
   webServer.on("/connecttest.txt", HTTP_GET, handleCaptiveRedirect);
   webServer.on("/ncsi.txt", HTTP_GET, handleCaptiveRedirect);
+  webServer.on("/redirect", HTTP_GET, handleCaptiveRedirect);
   webServer.onNotFound(handleNotFound);
 
   webServer.begin();
@@ -1078,9 +1191,8 @@ void setup() {
   Serial.println(F("[Servo] Gate calibrated closed (0°). Ready for operation."));
   Serial.flush();
 
-  // 5. Feeding Schedules: Initialized with 0 schedules until configured via app
-  scheduleCount = 0;
-  Serial.println(F("[Schedule] Feeder starts with 0 schedules (awaiting config from app)."));
+  // 5. Feeding Schedules: Load saved schedules from NVS flash (or default routines)
+  loadSchedulesFromNvs();
   Serial.flush();
 
   // 6. Connect Wi-Fi (Saved credentials in NVS, fallback, or Captive Portal)
